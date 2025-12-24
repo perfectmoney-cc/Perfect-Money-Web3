@@ -14,6 +14,7 @@ import { RevenueChart } from "@/components/merchant/RevenueChart";
 import { DashboardCustomizer } from "@/components/merchant/DashboardCustomizer";
 import { RevenueForecast } from "@/components/merchant/RevenueForecast";
 import { ABTesting } from "@/components/merchant/ABTesting";
+import { WebhookTester } from "@/components/merchant/WebhookTester";
 import { useMerchant } from "@/hooks/useMerchant";
 import { formatEther } from "viem";
 import { 
@@ -649,6 +650,9 @@ const MerchantPage = () => {
               </>
             )}
           </Card>
+
+          {/* Webhook Tester */}
+          <WebhookTester />
 
           {/* Dashboard Customizer */}
           <DashboardCustomizer />
