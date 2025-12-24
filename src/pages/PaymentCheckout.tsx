@@ -45,12 +45,8 @@ const PaymentCheckout = () => {
       if (!id) return;
       
       try {
-        const response = await supabase.functions.invoke('merchant-payment-api', {
-          body: null,
-          method: 'GET',
-        });
-
         // For demo, create mock payment link
+        // In production, this would fetch from the merchant-payment-api edge function
         const mockPayment: PaymentLink = {
           id: id,
           amount: 100,

@@ -266,42 +266,42 @@ const VirtualCardPage = () => {
         </div>
 
         {/* Virtual Card Display */}
-        <div className="relative mb-8">
-          <div className={`relative w-full max-w-md mx-auto aspect-[1.586/1] rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300`}>
+        <div className="relative mb-8 px-2 sm:px-0">
+          <div className={`relative w-full max-w-[360px] sm:max-w-md mx-auto aspect-[1.586/1] rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300`}>
             {/* Card Background - Red gradient matching Perfect Money style */}
             <div className="absolute inset-0 bg-gradient-to-br from-red-600 via-red-700 to-red-900" />
             
             {/* Hexagon Pattern Overlay */}
             <div className="absolute inset-0 opacity-15" style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0l17.32 10v20L20 40 2.68 30V10z' fill='none' stroke='%23ffffff' stroke-opacity='0.3'/%3E%3C/svg%3E")`,
-              backgroundSize: "30px 30px",
+              backgroundSize: "20px 20px",
             }} />
             
             {/* Gradient Overlay for depth */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/10" />
 
             {/* Card Content */}
-            <div className="relative h-full p-5 flex flex-col justify-between">
+            <div className="relative h-full p-3 sm:p-5 flex flex-col justify-between">
               {/* Header Row */}
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <img src={pmCardLogo} alt="PM" className="w-10 h-10 rounded-full shadow-lg" />
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <img src={pmCardLogo} alt="PM" className="w-7 h-7 sm:w-10 sm:h-10 rounded-full shadow-lg" />
                   <div>
-                    <p className="text-white font-bold text-sm">Perfect Money</p>
-                    <p className="text-white/70 text-[10px]">Virtual Card</p>
+                    <p className="text-white font-bold text-[10px] sm:text-sm">Perfect Money</p>
+                    <p className="text-white/70 text-[8px] sm:text-[10px]">Virtual Card</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-white font-bold tracking-wider">VISA</p>
-                  <p className="text-white/70 text-[10px]">VIRTUAL</p>
+                  <p className="text-white font-bold text-xs sm:text-base tracking-wider">VISA</p>
+                  <p className="text-white/70 text-[8px] sm:text-[10px]">VIRTUAL</p>
                 </div>
               </div>
 
               {/* Chip & QR Code Row */}
-              <div className="flex items-center justify-between my-4">
+              <div className="flex items-center justify-between my-2 sm:my-4">
                 {/* Chip */}
-                <div className="w-12 h-9 bg-gradient-to-br from-yellow-200 to-yellow-400 rounded-md flex items-center justify-center">
-                  <div className="w-8 h-6 border-2 border-yellow-600/50 rounded-sm grid grid-cols-2 gap-0.5 p-0.5">
+                <div className="w-9 h-7 sm:w-12 sm:h-9 bg-gradient-to-br from-yellow-200 to-yellow-400 rounded-md flex items-center justify-center">
+                  <div className="w-6 h-5 sm:w-8 sm:h-6 border-2 border-yellow-600/50 rounded-sm grid grid-cols-2 gap-0.5 p-0.5">
                     <div className="bg-yellow-600/30 rounded-[2px]" />
                     <div className="bg-yellow-600/30 rounded-[2px]" />
                     <div className="bg-yellow-600/30 rounded-[2px]" />
@@ -311,17 +311,17 @@ const VirtualCardPage = () => {
                 
                 {/* QR Code with Gold Border */}
                 {qrCodeUrl && (
-                  <div className="bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 p-1 rounded-lg shadow-lg">
-                    <div className="bg-white p-1 rounded-md">
-                      <img src={qrCodeUrl} alt="Card QR" className="w-12 h-12" />
+                  <div className="bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 p-0.5 sm:p-1 rounded-lg shadow-lg">
+                    <div className="bg-white p-0.5 sm:p-1 rounded-md">
+                      <img src={qrCodeUrl} alt="Card QR" className="w-9 h-9 sm:w-12 sm:h-12" />
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Card Number */}
-              <div className="mb-2">
-                <p className="text-white font-mono text-lg md:text-xl tracking-[0.2em] font-bold drop-shadow-lg">
+              <div className="mb-1 sm:mb-2">
+                <p className="text-white font-mono text-sm sm:text-lg md:text-xl tracking-[0.12em] sm:tracking-[0.2em] font-bold drop-shadow-lg">
                   {cardNumber}
                 </p>
               </div>
@@ -329,18 +329,18 @@ const VirtualCardPage = () => {
               {/* Footer Row */}
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-white/60 text-[10px] uppercase">Balance</p>
-                  <p className="text-white font-bold text-lg">
+                  <p className="text-white/60 text-[8px] sm:text-[10px] uppercase">Balance</p>
+                  <p className="text-white font-bold text-sm sm:text-lg">
                     {cardBalance.toLocaleString()} PM
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="flex items-center gap-2">
-                    <div className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full">
-                      <p className="text-white font-semibold text-xs">{tierNames[cardTier]}</p>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="px-2 py-0.5 sm:px-3 sm:py-1 bg-white/20 backdrop-blur-sm rounded-full">
+                      <p className="text-white font-semibold text-[10px] sm:text-xs">{tierNames[cardTier]}</p>
                     </div>
-                    <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-full flex items-center justify-center border-2 border-yellow-400 shadow-lg">
-                      <img src={pmTokenLogo} alt="PM" className="w-6 h-6" />
+                    <div className="w-7 h-7 sm:w-10 sm:h-10 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-full flex items-center justify-center border-2 border-yellow-400 shadow-lg">
+                      <img src={pmTokenLogo} alt="PM" className="w-4 h-4 sm:w-6 sm:h-6" />
                     </div>
                   </div>
                 </div>
