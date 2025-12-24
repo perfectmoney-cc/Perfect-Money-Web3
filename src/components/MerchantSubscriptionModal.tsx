@@ -249,23 +249,23 @@ export const MerchantSubscriptionModal = ({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
-          {/* Back to Dashboard Button */}
-          <div className="absolute left-4 top-4 z-50">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => {
-                onOpenChange(false);
-                navigate('/dashboard');
-              }}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </Button>
-          </div>
-
-          <DialogHeader>
+          <DialogHeader className="pt-2">
+            <div className="flex items-center justify-between mb-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate('/dashboard');
+                }}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Back to Dashboard</span>
+                <span className="sm:hidden">Back</span>
+              </Button>
+              <div className="w-20" /> {/* Spacer for balance */}
+            </div>
             <DialogTitle className="text-2xl text-center mb-2">
               Choose Your Merchant Plan
             </DialogTitle>
