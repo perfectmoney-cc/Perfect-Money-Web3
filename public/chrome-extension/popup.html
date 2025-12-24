@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perfect Money</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 320px;
+      min-height: 400px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%);
+      color: #ffffff;
+    }
+    .container {
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      background: linear-gradient(90deg, #dc2626, #ef4444);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+    .balance {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(90deg, #dc2626, #ef4444);
+      color: white;
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      margin-top: 8px;
+    }
+    .btn-outline:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .action-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: white;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .action-btn:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .action-icon {
+      font-size: 20px;
+    }
+    .footer {
+      text-align: center;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .footer-text {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .footer-link {
+      color: #dc2626;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="icon48.png" alt="PM Logo" class="logo">
+      <div>
+        <div class="title">Perfect Money</div>
+        <div class="subtitle">Decentralized Payments</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Total Balance</div>
+      <div class="balance">Connect Wallet</div>
+    </div>
+
+    <div class="quick-actions">
+      <button class="action-btn" onclick="openApp('send')">
+        <span class="action-icon">↗</span>
+        Send
+      </button>
+      <button class="action-btn" onclick="openApp('receive')">
+        <span class="action-icon">↙</span>
+        Receive
+      </button>
+      <button class="action-btn" onclick="openApp('swap')">
+        <span class="action-icon">⇄</span>
+        Swap
+      </button>
+    </div>
+
+    <button class="btn btn-primary" onclick="openApp('dashboard')">
+      Open Dashboard
+    </button>
+    <button class="btn btn-outline" onclick="openApp('')">
+      Visit Website
+    </button>
+
+    <div class="footer">
+      <p class="footer-text">
+        Powered by <a href="https://perfectmoney.cc" class="footer-link" target="_blank">perfectmoney.cc</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

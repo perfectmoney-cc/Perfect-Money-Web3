@@ -1,0 +1,28 @@
+project_id = "ihuqvxvcqnrdxphqxpqr"
+
+[functions.fetch-bsc-transactions]
+verify_jwt = false
+
+[functions.submit-partnership]
+verify_jwt = false
+
+[functions.upload-to-ipfs]
+verify_jwt = false
+
+[functions.send-order-status-email]
+verify_jwt = false
+
+[functions.payment-webhook]
+verify_jwt = false
+
+[functions.webhook-downtime-alert]
+verify_jwt = false
+
+[functions.webhook-recovery-alert]
+verify_jwt = false
+
+[functions.fetch-virtual-card-events]
+verify_jwt = false
+
+[functions.merchant-payment-api]
+verify_jwt = false
