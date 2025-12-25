@@ -13,7 +13,7 @@ import QRCode from "qrcode";
 import pmTokenLogo from "@/assets/pm-token-logo.png";
 import pmCardLogo from "@/assets/pm-card-logo.png";
 import { PM_TOKEN_ADDRESS, CONTRACT_ADDRESSES } from "@/contracts/addresses";
-import { VIRTUAL_CARD_ABI, VIRTUAL_CARD_CONTRACT_ADDRESS } from "@/contracts/virtualCardABI";
+import { VIRTUAL_CARD_ABI } from "@/contracts/virtualCardABI";
 import { PMMerchantABI } from "@/contracts/merchantABI";
 import VirtualCardTransactionHistory from "@/components/VirtualCardTransactionHistory";
 import {
@@ -50,8 +50,8 @@ const VirtualCardPage = () => {
   const [selectedMerchant, setSelectedMerchant] = useState<string>("");
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loadingMerchants, setLoadingMerchants] = useState(false);
-
   const MERCHANT_CONTRACT_ADDRESS = CONTRACT_ADDRESSES[56].PMMerchant;
+  const VIRTUAL_CARD_CONTRACT_ADDRESS = CONTRACT_ADDRESSES[56].PMVirtualCard || "0x0000000000000000000000000000000000000000";
 
   // Get PM token balance
   const { data: tokenBalance } = useBalance({

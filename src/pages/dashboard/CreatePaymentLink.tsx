@@ -224,7 +224,56 @@ const CreatePaymentLink = () => {
     toast.success("Payment link created successfully!");
   };
 
-  const handlePaymentComplete = () => {
+  // Trigger webhook notifications when payment is received
+  const triggerPaymentWebhook = async (paymentData: {
+    linkId: string;
+    amount: string;
+    merchant: string;
+    status: string;
+  }) => {
+    if (!address) return;
+    
+    const storedEndpoints = localStorage.getItem(`webhookEndpoints_${address}`);
+    if (!storedEndpoints) return;
+    
+    const endpoints = JSON.parse(storedEndpoints);
+    const activeEndpoints = endpoints.filter((e: any) => e.active && e.events.includes("payment.completed"));
+    
+    for (const endpoint of activeEndpoints) {
+      try {
+        // In production, this would be sent from a backend
+        // For demo purposes, we simulate the webhook payload
+        const payload = {
+          event: "payment.completed",
+          timestamp: Date.now(),
+          data: {
+            linkId: paymentData.linkId,
+            amount: paymentData.amount,
+            merchant: paymentData.merchant,
+            status: paymentData.status,
+            txHash: `0x${Math.random().toString(16).slice(2)}`,
+          },
+          signature: `sha256=${endpoint.secret.slice(0, 20)}...`,
+        };
+        
+        console.log("Webhook payload:", payload);
+        
+        // Update endpoint stats
+        const updatedEndpoints = endpoints.map((e: any) =>
+          e.id === endpoint.id
+            ? { ...e, lastTriggered: Date.now(), successCount: e.successCount + 1 }
+            : e
+        );
+        localStorage.setItem(`webhookEndpoints_${address}`, JSON.stringify(updatedEndpoints));
+        
+        toast.success(`Webhook sent to ${endpoint.url.slice(0, 30)}...`);
+      } catch (error) {
+        console.error("Webhook error:", error);
+      }
+    }
+  };
+
+  const handlePaymentComplete = async () => {
     const pmBalanceLocal = parseFloat(localStorage.getItem("pmBalance") || "10000");
     const newBalance = pmBalanceLocal + parseFloat(amount);
     localStorage.setItem("pmBalance", newBalance.toString());
@@ -252,6 +301,14 @@ const CreatePaymentLink = () => {
     window.dispatchEvent(new Event("balanceUpdate"));
     window.dispatchEvent(new Event("transactionUpdate"));
     window.dispatchEvent(new Event("merchantTransactionUpdate"));
+    
+    // Trigger webhook notifications
+    await triggerPaymentWebhook({
+      linkId,
+      amount,
+      merchant: address || "",
+      status: "completed"
+    });
     
     toast.success(`Payment of ${amount} PM received!`);
   };
