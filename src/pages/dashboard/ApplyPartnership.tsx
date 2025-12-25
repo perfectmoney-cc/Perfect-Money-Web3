@@ -10,23 +10,37 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
 import {
   ArrowLeft,
-  Handshake,
+  Globe,
   Building2,
   User,
   Mail,
   Phone,
-  Globe,
   MapPin,
   Calendar,
   Users,
   FileText,
   Upload,
+  Coins,
+  Lock,
+  CheckCircle,
+  AlertCircle,
+  Handshake,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useAccount } from "wagmi";
+
+const STAKING_TIERS = [
+  { tier: "Bronze", amount: 1000, revenueShare: "5%", benefits: ["Basic support", "Standard commission rates"] },
+  { tier: "Silver", amount: 5000, revenueShare: "10%", benefits: ["Priority support", "Enhanced commission rates"] },
+  { tier: "Gold", amount: 25000, revenueShare: "15%", benefits: ["Dedicated manager", "Premium commission rates"] },
+  { tier: "Platinum", amount: 100000, revenueShare: "20%", benefits: ["VIP benefits", "Highest commission rates", "Early feature access"] },
+];
 
 const ApplyPartnership = () => {
+  const { address, isConnected } = useAccount();
+  const [selectedTier, setSelectedTier] = useState<number>(0);
   const [formData, setFormData] = useState({
     companyName: "",
     industrySector: "",
@@ -48,6 +62,9 @@ const ApplyPartnership = () => {
     comments: "",
   });
 
+  // Mock balance for demo - in production use useReadContract
+  const balance = 50000;
+
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -55,23 +72,37 @@ const ApplyPartnership = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Google Sheets URL for direct submission via Google Forms/Apps Script
-  // This uses the Google Sheets web API to append data directly
   const GOOGLE_SHEETS_URL =
     "https://docs.google.com/spreadsheets/d/1ykn3YfnCNlb8iRn3Uli3VvI3Ij0iTMc1vilGYogeZX4/edit";
   
-  // Google Apps Script web app URL for form submission (handles the actual data submission)
+  // Google Apps Script web app URL for form submission
   const GOOGLE_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycby0ZANQc9fm1140WSIUhb236USEAkI738TSm__2gV53jcoxcomeM_R9jsFXk4RFQlnDQg/exec";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isConnected) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    const requiredStake = STAKING_TIERS[selectedTier].amount;
+
+    if (balance < requiredStake) {
+      toast.error(`Insufficient PM tokens. You need ${requiredStake.toLocaleString()} PM for ${STAKING_TIERS[selectedTier].tier} tier.`);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Prepare form data for Google Sheets (ordered to match spreadsheet columns)
+      // Prepare form data for Google Sheets
       const rowData = {
         timestamp: new Date().toISOString(),
+        walletAddress: address,
+        stakingTier: STAKING_TIERS[selectedTier].tier,
+        stakeAmount: STAKING_TIERS[selectedTier].amount,
         companyName: formData.companyName,
         industrySector: formData.industrySector,
         websiteUrl: formData.websiteUrl,
@@ -92,7 +123,7 @@ const ApplyPartnership = () => {
         comments: formData.comments,
       };
 
-      // Send data to Google Apps Script which will append to Google Sheets
+      // Send data to Google Apps Script
       await fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
@@ -100,9 +131,8 @@ const ApplyPartnership = () => {
         body: JSON.stringify(rowData),
       });
 
-      // With no-cors we can't read response, but if no error thrown, assume success
       toast.success(
-        "Partnership application submitted successfully! Our team will review and contact you within 5-7 business days.",
+        `Exchanger application submitted for ${STAKING_TIERS[selectedTier].tier} tier! Our team will review and contact you within 5-7 business days.`,
       );
       setFormData({
         companyName: "",
@@ -137,8 +167,8 @@ const ApplyPartnership = () => {
       <Header />
       <TradingViewTicker />
       <HeroBanner
-        title="Partnership Application"
-        subtitle="Please provide accurate information to help us evaluate your partnership request"
+        title="Exchanger Application"
+        subtitle="Join our global network of PM Token exchangers with staking benefits"
       />
 
       <main className="container mx-auto px-4 pt-12 pb-12 flex-1">
@@ -147,54 +177,113 @@ const ApplyPartnership = () => {
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Partners
+          Back to Exchangers
         </Link>
 
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-3 mb-8">
             <div className="p-3 rounded-lg bg-primary/10">
-              <Handshake className="h-6 w-6 text-primary" />
+              <Globe className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">Partnership Application</h1>
-              <p className="text-muted-foreground">Complete all required fields to submit your application</p>
+              <h1 className="text-3xl font-bold">Exchanger Application</h1>
+              <p className="text-muted-foreground">Stake PM tokens to unlock exchanger benefits</p>
             </div>
           </div>
+
+          {/* Staking Tier Selection */}
+          <Card className="p-6 bg-card/50 backdrop-blur-sm mb-8">
+            <div className="flex items-center gap-2 mb-6">
+              <Coins className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-semibold">Select Staking Tier</h2>
+            </div>
+
+            {isConnected && (
+              <div className="mb-4 p-3 rounded-lg bg-muted/50 flex items-center gap-2">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Your PM Balance: <strong>{balance.toLocaleString()} PM</strong></span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {STAKING_TIERS.map((tier, index) => {
+                const canAfford = balance >= tier.amount;
+                const isSelected = selectedTier === index;
+                return (
+                  <div
+                    key={tier.tier}
+                    onClick={() => setSelectedTier(index)}
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      isSelected 
+                        ? "border-primary bg-primary/10" 
+                        : canAfford 
+                          ? "border-border hover:border-primary/50" 
+                          : "border-border opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`font-bold ${
+                        tier.tier === "Bronze" ? "text-amber-600" :
+                        tier.tier === "Silver" ? "text-gray-400" :
+                        tier.tier === "Gold" ? "text-yellow-500" :
+                        "text-purple-500"
+                      }`}>{tier.tier}</span>
+                      {isSelected && <CheckCircle className="h-4 w-4 text-primary" />}
+                    </div>
+                    <p className="text-2xl font-bold mb-1">{tier.amount.toLocaleString()} PM</p>
+                    <p className="text-sm text-muted-foreground mb-2">{tier.revenueShare} revenue share</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      {tier.benefits.map((benefit, i) => (
+                        <li key={i} className="flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                          {benefit}
+                        </li>
+                      ))}
+                    </ul>
+                    {!canAfford && (
+                      <div className="mt-2 flex items-center gap-1 text-xs text-destructive">
+                        <AlertCircle className="h-3 w-3" />
+                        Insufficient balance
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
 
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Company Information Section */}
             <Card className="p-6 bg-card/50 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-6">
                 <Building2 className="h-5 w-5 text-primary" />
-                <h2 className="text-xl font-semibold">Company Information</h2>
+                <h2 className="text-xl font-semibold">Exchange Business Information</h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Company Name *</label>
+                  <label className="text-sm font-medium mb-2 block">Business Name *</label>
                   <Input
-                    placeholder="Enter your registered legal business name"
+                    placeholder="Enter your registered exchange business name"
                     value={formData.companyName}
                     onChange={(e) => handleChange("companyName", e.target.value)}
                     required
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Industry Sector *</label>
+                  <label className="text-sm font-medium mb-2 block">Business Type *</label>
                   <Select value={formData.industrySector} onValueChange={(v) => handleChange("industrySector", v)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select your industry" />
+                      <SelectValue placeholder="Select your business type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="financial-services">Financial Services</SelectItem>
-                      <SelectItem value="exchange">Exchange Platform</SelectItem>
-                      <SelectItem value="wallet">Wallet Provider</SelectItem>
+                      <SelectItem value="currency-exchange">Currency Exchange</SelectItem>
+                      <SelectItem value="remittance">Remittance Services</SelectItem>
+                      <SelectItem value="money-transfer">Money Transfer</SelectItem>
                       <SelectItem value="payment-gateway">Payment Gateway</SelectItem>
+                      <SelectItem value="crypto-exchange">Crypto Exchange</SelectItem>
+                      <SelectItem value="forex">Forex Trading</SelectItem>
                       <SelectItem value="fintech">FinTech</SelectItem>
-                      <SelectItem value="compliance">Compliance Solutions</SelectItem>
-                      <SelectItem value="defi">DeFi Protocol</SelectItem>
-                      <SelectItem value="nft">NFT Platform</SelectItem>
-                      <SelectItem value="gaming">Blockchain Gaming</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
@@ -205,7 +294,7 @@ const ApplyPartnership = () => {
                     <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="url"
-                      placeholder="https://www.yourcompany.com"
+                      placeholder="https://www.yourbusiness.com"
                       className="pl-10"
                       value={formData.websiteUrl}
                       onChange={(e) => handleChange("websiteUrl", e.target.value)}
@@ -214,11 +303,11 @@ const ApplyPartnership = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Headquarters Location *</label>
+                  <label className="text-sm font-medium mb-2 block">Operating Location *</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="City, Country"
+                      placeholder="City, Country (e.g., Manila, Philippines)"
                       className="pl-10"
                       value={formData.headquarters}
                       onChange={(e) => handleChange("headquarters", e.target.value)}
@@ -240,18 +329,17 @@ const ApplyPartnership = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Company Size *</label>
+                  <label className="text-sm font-medium mb-2 block">Team Size *</label>
                   <Select value={formData.companySize} onValueChange={(v) => handleChange("companySize", v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Number of employees" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1-10">1-10 employees</SelectItem>
-                      <SelectItem value="11-50">11-50 employees</SelectItem>
-                      <SelectItem value="51-200">51-200 employees</SelectItem>
-                      <SelectItem value="201-500">201-500 employees</SelectItem>
-                      <SelectItem value="501-1000">501-1000 employees</SelectItem>
-                      <SelectItem value="1000+">1000+ employees</SelectItem>
+                      <SelectItem value="1-5">1-5 employees</SelectItem>
+                      <SelectItem value="6-20">6-20 employees</SelectItem>
+                      <SelectItem value="21-50">21-50 employees</SelectItem>
+                      <SelectItem value="51-100">51-100 employees</SelectItem>
+                      <SelectItem value="100+">100+ employees</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
