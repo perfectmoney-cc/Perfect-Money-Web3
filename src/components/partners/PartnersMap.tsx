@@ -1,17 +1,8 @@
-import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { useEffect, useRef, useState } from "react";
+import { Building2, Globe, MapPin, Loader2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Building2, Globe, MapPin } from "lucide-react";
-import { Card } from "@/components/ui/card";
-
-// Fix for default marker icons in react-leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
 
 interface Partner {
   id: number;
@@ -41,17 +32,71 @@ const partnerLocations: Partner[] = [
   { id: 12, name: "Toronto DeFi", type: "Marketplace", country: "Canada", city: "Toronto", lat: 43.6532, lng: -79.3832, status: "Active", description: "DeFi aggregator platform" },
 ];
 
-const createCustomIcon = (status: string) => {
-  const color = status === "Active" ? "#22c55e" : status === "Pending" ? "#eab308" : "#ef4444";
-  return L.divIcon({
-    className: "custom-marker",
-    html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-  });
-};
-
 const PartnersMap = () => {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    // Initialize map
+    const map = L.map(mapContainerRef.current, {
+      center: [20, 0],
+      zoom: 2,
+      scrollWheelZoom: true,
+    });
+
+    mapRef.current = map;
+
+    // Add OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Add markers for each partner
+    partnerLocations.forEach((partner) => {
+      const color = partner.status === "Active" ? "#22c55e" : partner.status === "Pending" ? "#eab308" : "#ef4444";
+      
+      const icon = L.divIcon({
+        className: "custom-marker",
+        html: `<div style="background-color: ${color}; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+
+      const marker = L.marker([partner.lat, partner.lng], { icon }).addTo(map);
+      
+      const popupContent = `
+        <div style="padding: 8px; min-width: 180px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <strong>${partner.name}</strong>
+          </div>
+          <div style="font-size: 12px; color: #666;">
+            <p>${partner.type}</p>
+            <p>📍 ${partner.city}, ${partner.country}</p>
+            ${partner.description ? `<p style="margin-top: 4px;">${partner.description}</p>` : ''}
+            <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; margin-top: 8px; background: ${color}20; color: ${color};">
+              ${partner.status}
+            </span>
+          </div>
+        </div>
+      `;
+      
+      marker.bindPopup(popupContent);
+    });
+
+    setIsLoading(false);
+
+    // Cleanup
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4 mb-4">
@@ -69,54 +114,17 @@ const PartnersMap = () => {
         </div>
       </div>
       
-      <Card className="overflow-hidden rounded-xl border-border">
-        <MapContainer
-          center={[20, 0]}
-          zoom={2}
+      <Card className="overflow-hidden rounded-xl border-border relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+        <div 
+          ref={mapContainerRef} 
           style={{ height: "500px", width: "100%" }}
-          scrollWheelZoom={true}
           className="z-0"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          {partnerLocations.map((partner) => (
-            <Marker
-              key={partner.id}
-              position={[partner.lat, partner.lng]}
-              icon={createCustomIcon(partner.status)}
-            >
-              <Popup>
-                <div className="p-2 min-w-[200px]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    <span className="font-bold">{partner.name}</span>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <p className="text-muted-foreground">{partner.type}</p>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      <span>{partner.city}, {partner.country}</span>
-                    </div>
-                    {partner.description && (
-                      <p className="text-xs text-muted-foreground mt-2">{partner.description}</p>
-                    )}
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs mt-2 ${
-                      partner.status === "Active" 
-                        ? "bg-green-500/20 text-green-500" 
-                        : partner.status === "Pending"
-                        ? "bg-yellow-500/20 text-yellow-500"
-                        : "bg-red-500/20 text-red-500"
-                    }`}>
-                      {partner.status}
-                    </span>
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
+        />
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">

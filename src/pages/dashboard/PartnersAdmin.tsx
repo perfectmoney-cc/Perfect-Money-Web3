@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Settings, Users, Building2, Globe, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, MapPin, ExternalLink } from "lucide-react";
+import { ArrowLeft, Settings, Users, Building2, Globe, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, MapPin, ExternalLink, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { bsc } from "wagmi/chains";
 import { toast } from "sonner";
 import { formatEther, parseEther } from "viem";
 import { CONTRACT_ADDRESSES } from "@/contracts/addresses";
+import { PMPartnershipABI, PM_PARTNERSHIP_CONTRACT_ADDRESS } from "@/contracts/partnershipABI";
 import {
   Dialog,
   DialogContent,
@@ -24,8 +25,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Mock partner applications data
+const tierNames = ["Bronze", "Silver", "Gold", "Platinum"];
+
+// Mock data - will be replaced with blockchain data when contract is deployed
 const mockApplications = [
   { id: 1, name: "Crypto Ventures Ltd", email: "contact@cryptoventures.com", type: "Exchange", country: "USA", status: "Pending", appliedAt: "2024-01-15" },
   { id: 2, name: "BlockTech Inc", email: "info@blocktech.io", type: "Technology", country: "UK", status: "Pending", appliedAt: "2024-01-18" },
@@ -34,10 +38,10 @@ const mockApplications = [
 ];
 
 const mockPartners = [
-  { id: 1, name: "CryptoExchange Pro", type: "Exchange", country: "USA", status: "Active", revenue: "125,000", joinedAt: "2023-06-15" },
-  { id: 2, name: "BlockTech Solutions", type: "Technology", country: "UK", status: "Active", revenue: "89,500", joinedAt: "2023-07-22" },
-  { id: 3, name: "Asia Wallet", type: "Wallet Provider", country: "Singapore", status: "Active", revenue: "156,200", joinedAt: "2023-08-10" },
-  { id: 4, name: "Euro Digital", type: "Marketplace", country: "Germany", status: "Inactive", revenue: "45,300", joinedAt: "2023-09-05" },
+  { id: 1, name: "CryptoExchange Pro", type: "Exchange", country: "USA", status: "Active", revenue: "125,000", joinedAt: "2023-06-15", wallet: "0x1234...5678" },
+  { id: 2, name: "BlockTech Solutions", type: "Technology", country: "UK", status: "Active", revenue: "89,500", joinedAt: "2023-07-22", wallet: "0xabcd...efgh" },
+  { id: 3, name: "Asia Wallet", type: "Wallet Provider", country: "Singapore", status: "Active", revenue: "156,200", joinedAt: "2023-08-10", wallet: "0x9876...5432" },
+  { id: 4, name: "Euro Digital", type: "Marketplace", country: "Germany", status: "Inactive", revenue: "45,300", joinedAt: "2023-09-05", wallet: "0xfedc...ba98" },
 ];
 
 const PartnersAdmin = () => {
@@ -54,20 +58,110 @@ const PartnersAdmin = () => {
     lng: ""
   });
 
-  // Check if user is owner (mock - would be from contract)
-  const isOwner = true; // In production, check against contract owner
+  // Read global stats from contract
+  const { data: globalStats, refetch: refetchStats } = useReadContract({
+    address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
+    abi: PMPartnershipABI,
+    functionName: "getGlobalStats",
+    query: { enabled: PM_PARTNERSHIP_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000" }
+  });
+
+  // Read contract owner
+  const { data: contractOwner } = useReadContract({
+    address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
+    abi: PMPartnershipABI,
+    functionName: "owner",
+    query: { enabled: PM_PARTNERSHIP_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000" }
+  });
+
+  // Contract writes
+  const { writeContract: approveApp, data: approveHash, isPending: isApproving } = useWriteContract();
+  const { writeContract: rejectApp, data: rejectHash, isPending: isRejecting } = useWriteContract();
+  const { writeContract: updateStatus, data: statusHash, isPending: isUpdatingStatus } = useWriteContract();
+  const { writeContract: addPartnerFn, data: addHash, isPending: isAdding } = useWriteContract();
+
+  // Transaction receipts
+  const { isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveHash });
+  const { isSuccess: rejectSuccess } = useWaitForTransactionReceipt({ hash: rejectHash });
+  const { isSuccess: statusSuccess } = useWaitForTransactionReceipt({ hash: statusHash });
+  const { isSuccess: addSuccess } = useWaitForTransactionReceipt({ hash: addHash });
+
+  useEffect(() => {
+    if (approveSuccess) {
+      toast.success("Application approved!");
+      refetchStats();
+    }
+    if (rejectSuccess) {
+      toast.success("Application rejected");
+      refetchStats();
+    }
+    if (statusSuccess) {
+      toast.success("Partner status updated!");
+      refetchStats();
+    }
+    if (addSuccess) {
+      toast.success("Partner added successfully!");
+      setShowAddPartner(false);
+      setNewPartner({ name: "", email: "", type: "", country: "", description: "", lat: "", lng: "" });
+      refetchStats();
+    }
+  }, [approveSuccess, rejectSuccess, statusSuccess, addSuccess]);
+
+  // Check if user is contract owner
+  const isOwner = contractOwner 
+    ? contractOwner.toLowerCase() === address?.toLowerCase() 
+    : true; // Default to true for mock data when contract not deployed
+
+  // Use blockchain stats if available, otherwise use mock data
+  const totalPartners = globalStats ? Number(globalStats[0]) : mockPartners.length;
+  const activePartners = globalStats ? Number(globalStats[1]) : mockPartners.filter(p => p.status === "Active").length;
+  const pendingApplications = globalStats ? Number(globalStats[2]) : mockApplications.filter(a => a.status === "Pending").length;
+  const totalRevenuePaid = globalStats ? Number(formatEther(globalStats[3])) : 0;
 
   const handleApprove = (id: number) => {
-    toast.success(`Application #${id} approved!`);
+    if (PM_PARTNERSHIP_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000") {
+      approveApp({
+        address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
+        abi: PMPartnershipABI,
+        functionName: "approveApplication",
+        args: [BigInt(id)],
+        account: address,
+        chain: bsc
+      });
+    } else {
+      toast.success(`Application #${id} approved! (Mock)`);
+    }
   };
 
   const handleReject = (id: number) => {
-    toast.error(`Application #${id} rejected`);
+    if (PM_PARTNERSHIP_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000") {
+      rejectApp({
+        address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
+        abi: PMPartnershipABI,
+        functionName: "rejectApplication",
+        args: [BigInt(id), "Rejected by admin"],
+        account: address,
+        chain: bsc
+      });
+    } else {
+      toast.error(`Application #${id} rejected (Mock)`);
+    }
   };
 
-  const handleToggleStatus = (id: number, currentStatus: string) => {
-    const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
-    toast.success(`Partner status changed to ${newStatus}`);
+  const handleToggleStatus = (walletAddress: string, currentStatus: string) => {
+    const newStatus = currentStatus === "Active";
+    if (PM_PARTNERSHIP_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000") {
+      updateStatus({
+        address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
+        abi: PMPartnershipABI,
+        functionName: "updatePartnerStatus",
+        args: [walletAddress as `0x${string}`, !newStatus],
+        account: address,
+        chain: bsc
+      });
+    } else {
+      toast.success(`Partner status changed to ${newStatus ? "Inactive" : "Active"} (Mock)`);
+    }
   };
 
   const handleAddPartner = () => {
@@ -75,9 +169,33 @@ const PartnersAdmin = () => {
       toast.error("Please fill in all required fields");
       return;
     }
-    toast.success("Partner added successfully!");
-    setShowAddPartner(false);
-    setNewPartner({ name: "", email: "", type: "", country: "", description: "", lat: "", lng: "" });
+    
+    if (PM_PARTNERSHIP_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000" && address) {
+      const lat = parseFloat(newPartner.lat) * 1e6 || 0;
+      const lng = parseFloat(newPartner.lng) * 1e6 || 0;
+      
+      addPartnerFn({
+        address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
+        abi: PMPartnershipABI,
+        functionName: "addPartner",
+        args: [
+          address, // Using current wallet as partner address for demo
+          newPartner.name,
+          newPartner.type,
+          newPartner.country,
+          "",
+          BigInt(Math.floor(lat)),
+          BigInt(Math.floor(lng)),
+          0 // Bronze tier
+        ],
+        account: address,
+        chain: bsc
+      });
+    } else {
+      toast.success("Partner added successfully! (Mock)");
+      setShowAddPartner(false);
+      setNewPartner({ name: "", email: "", type: "", country: "", description: "", lat: "", lng: "" });
+    }
   };
 
   if (!isConnected) {
@@ -303,7 +421,7 @@ const PartnersAdmin = () => {
                           <div className="flex gap-2 justify-end">
                             <Switch
                               checked={partner.status === "Active"}
-                              onCheckedChange={() => handleToggleStatus(partner.id, partner.status)}
+                              onCheckedChange={() => handleToggleStatus(partner.wallet || `0x${partner.id}`, partner.status)}
                             />
                             <Button variant="ghost" size="icon">
                               <Edit className="h-4 w-4" />
