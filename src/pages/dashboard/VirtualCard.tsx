@@ -18,6 +18,7 @@ import { VIRTUAL_CARD_ABI } from "@/contracts/virtualCardABI";
 import { PMMerchantABI } from "@/contracts/merchantABI";
 import VirtualCardTransactionHistory from "@/components/VirtualCardTransactionHistory";
 import VirtualCardTopUp from "@/components/virtual-card/VirtualCardTopUp";
+import TierUpgradeCard from "@/components/virtual-card/TierUpgradeCard";
 import {
   Dialog,
   DialogContent,
@@ -686,39 +687,16 @@ const VirtualCardPage = () => {
           <VirtualCardTransactionHistory />
         </div>
 
-        {/* Tier Benefits */}
-        <Card className="mt-6 bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-sm">Tier Benefits</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {tierNames.map((name, index) => (
-                <div
-                  key={name}
-                  className={`p-3 rounded-lg border ${
-                    index === cardTier
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-muted/50"
-                  }`}
-                >
-                  <p className={`font-semibold text-sm ${index === cardTier ? "text-primary" : ""}`}>
-                    {name}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {index === 0 && "0.5% Cashback"}
-                    {index === 1 && "1% Cashback"}
-                    {index === 2 && "1.5% Cashback"}
-                    {index === 3 && "2% Cashback"}
-                    {index === 4 && "2.5% Cashback"}
-                    {index === 5 && "3% Cashback"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Tier Upgrade Card */}
+        <div className="mt-6">
+          <TierUpgradeCard 
+            currentTier={cardTier} 
+            totalDeposited={totalDeposited} 
+            hasCard={!!hasCard} 
+          />
+        </div>
           </TabsContent>
+
 
           <TabsContent value="topup">
             <VirtualCardTopUp />

@@ -56,6 +56,7 @@ import VaultPage from "./pages/dashboard/Vault";
 import VaultAdminPage from "./pages/dashboard/VaultAdmin";
 import VirtualCardPage from "./pages/dashboard/VirtualCard";
 import VirtualCardAdmin from "./pages/dashboard/VirtualCardAdmin";
+import PartnersAdmin from "./pages/dashboard/PartnersAdmin";
 import MerchantMultiCurrency from "./pages/dashboard/MerchantMultiCurrency";
 import MerchantLoyalty from "./pages/dashboard/MerchantLoyalty";
 import MerchantPOS from "./pages/dashboard/MerchantPOS";
@@ -109,6 +110,7 @@ const App = () => (
               <Route path="/dashboard/referral" element={<ReferralPage />} />
               <Route path="/dashboard/partners" element={<PartnersPage />} />
               <Route path="/dashboard/partners/apply" element={<ApplyPartnership />} />
+              <Route path="/dashboard/partners/admin" element={<PartnersAdmin />} />
               <Route path="/dashboard/merchant/generate-qr" element={<GeneratePaymentQR />} />
               <Route path="/dashboard/merchant/create-link" element={<CreatePaymentLink />} />
               <Route path="/dashboard/merchant/share-link" element={<ShareLinkDetails />} />
