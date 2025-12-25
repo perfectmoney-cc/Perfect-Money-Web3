@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, ArrowDownToLine, QrCode, Copy, Loader2, Sparkles, ShoppingCart, Settings, Store, AlertCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, CreditCard, ArrowDownToLine, QrCode, Copy, Loader2, Sparkles, ShoppingCart, Settings, Store, AlertCircle, ArrowUpCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { bsc } from "wagmi/chains";
@@ -16,6 +17,7 @@ import { PM_TOKEN_ADDRESS, CONTRACT_ADDRESSES } from "@/contracts/addresses";
 import { VIRTUAL_CARD_ABI } from "@/contracts/virtualCardABI";
 import { PMMerchantABI } from "@/contracts/merchantABI";
 import VirtualCardTransactionHistory from "@/components/VirtualCardTransactionHistory";
+import VirtualCardTopUp from "@/components/virtual-card/VirtualCardTopUp";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +53,7 @@ const VirtualCardPage = () => {
   const [selectedMerchant, setSelectedMerchant] = useState<string>("");
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loadingMerchants, setLoadingMerchants] = useState(false);
+  const [activeTab, setActiveTab] = useState("card");
   const MERCHANT_CONTRACT_ADDRESS = CONTRACT_ADDRESSES[56].PMMerchant;
   const VIRTUAL_CARD_CONTRACT_ADDRESS = CONTRACT_ADDRESSES[56].PMVirtualCard || "0x0000000000000000000000000000000000000000";
 
@@ -109,6 +112,16 @@ const VirtualCardPage = () => {
     args: cardInfo ? [cardInfo.tier] : undefined,
     query: { enabled: !!cardInfo }
   });
+
+  // Check if user is contract owner
+  const { data: contractOwner } = useReadContract({
+    address: VIRTUAL_CARD_CONTRACT_ADDRESS as `0x${string}`,
+    abi: VIRTUAL_CARD_ABI,
+    functionName: "owner",
+    query: { enabled: VIRTUAL_CARD_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000" }
+  });
+
+  const isOwner = contractOwner?.toLowerCase() === address?.toLowerCase();
 
   // Contract write functions
   const { writeContract: createCard, data: createHash, isPending: isCreating } = useWriteContract();
@@ -295,16 +308,36 @@ const VirtualCardPage = () => {
               <p className="text-muted-foreground text-sm">Your crypto debit card</p>
             </div>
           </div>
-          <Link to="/dashboard/virtual-card/admin">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Admin
-            </Button>
-          </Link>
+          {isOwner && (
+            <Link to="/dashboard/virtual-card/admin">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Admin
+              </Button>
+            </Link>
+          )}
         </div>
 
-        {/* Virtual Card Display */}
-        <div className="relative mb-8 px-2 sm:px-0">
+        {/* Tab Navigation */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="card" className="gap-2">
+              <CreditCard className="h-4 w-4" />
+              Card
+            </TabsTrigger>
+            <TabsTrigger value="topup" className="gap-2" disabled={!hasCard}>
+              <ArrowUpCircle className="h-4 w-4" />
+              Top Up
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              History
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="card">
+            {/* Virtual Card Display */}
+            <div className="relative mb-8 px-2 sm:px-0">
           {/* Blur overlay for inactive/non-existent cards */}
           {shouldBlurCard && (
             <div className="absolute inset-0 z-20 flex items-center justify-center">
@@ -685,6 +718,16 @@ const VirtualCardPage = () => {
             </div>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="topup">
+            <VirtualCardTopUp />
+          </TabsContent>
+
+          <TabsContent value="history">
+            <VirtualCardTransactionHistory />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
