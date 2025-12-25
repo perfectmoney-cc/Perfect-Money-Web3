@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Settings, CreditCard, Users, DollarSign, Loader2, Shield, Crown, Star, Gem, Award, Medal, RefreshCw, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Settings, CreditCard, Users, DollarSign, Loader2, Shield, Crown, Star, Gem, Award, Medal, RefreshCw, ExternalLink, Snowflake, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { bsc } from "wagmi/chains";
@@ -73,11 +74,15 @@ const VirtualCardAdmin = () => {
   const { writeContract: setTopUpFee, data: feeHash, isPending: isSettingFee } = useWriteContract();
   const { writeContract: pauseContract, data: pauseHash, isPending: isPausing } = useWriteContract();
   const { writeContract: unpauseContract, data: unpauseHash, isPending: isUnpausing } = useWriteContract();
+  const { writeContract: freezeCard, data: freezeHash, isPending: isFreezing } = useWriteContract();
+  const { writeContract: unfreezeCard, data: unfreezeHash, isPending: isUnfreezing } = useWriteContract();
 
   // Transaction receipts
   const { isSuccess: feeSuccess } = useWaitForTransactionReceipt({ hash: feeHash });
   const { isSuccess: pauseSuccess } = useWaitForTransactionReceipt({ hash: pauseHash });
   const { isSuccess: unpauseSuccess } = useWaitForTransactionReceipt({ hash: unpauseHash });
+  const { isSuccess: freezeSuccess } = useWaitForTransactionReceipt({ hash: freezeHash });
+  const { isSuccess: unfreezeSuccess } = useWaitForTransactionReceipt({ hash: unfreezeHash });
 
   useEffect(() => {
     if (tierInfo) {
@@ -99,7 +104,15 @@ const VirtualCardAdmin = () => {
     if (pauseSuccess || unpauseSuccess) {
       toast.success(pauseSuccess ? "Contract paused" : "Contract unpaused");
     }
-  }, [feeSuccess, pauseSuccess, unpauseSuccess]);
+    if (freezeSuccess) {
+      toast.success("Card frozen successfully!");
+      refetchEvents();
+    }
+    if (unfreezeSuccess) {
+      toast.success("Card unfrozen successfully!");
+      refetchEvents();
+    }
+  }, [feeSuccess, pauseSuccess, unpauseSuccess, freezeSuccess, unfreezeSuccess]);
 
   const handleSetFee = () => {
     if (!topUpFeeInput || isNaN(Number(topUpFeeInput))) {
@@ -135,6 +148,28 @@ const VirtualCardAdmin = () => {
         chain: bsc
       });
     }
+  };
+
+  const handleFreezeCard = (userAddress: string) => {
+    freezeCard({
+      address: VIRTUAL_CARD_CONTRACT_ADDRESS as `0x${string}`,
+      abi: VIRTUAL_CARD_ABI,
+      functionName: "freezeCard",
+      args: [userAddress as `0x${string}`],
+      account: address,
+      chain: bsc
+    });
+  };
+
+  const handleUnfreezeCard = (userAddress: string) => {
+    unfreezeCard({
+      address: VIRTUAL_CARD_CONTRACT_ADDRESS as `0x${string}`,
+      abi: VIRTUAL_CARD_ABI,
+      functionName: "unfreezeCard",
+      args: [userAddress as `0x${string}`],
+      account: address,
+      chain: bsc
+    });
   };
 
   const truncateAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -276,6 +311,7 @@ const VirtualCardAdmin = () => {
                       <TableHead>Tier</TableHead>
                       <TableHead>Block</TableHead>
                       <TableHead>Transaction</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -286,11 +322,12 @@ const VirtualCardAdmin = () => {
                           <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                           <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         </TableRow>
                       ))
                     ) : cardEvents.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                           No card creation events found on blockchain
                         </TableCell>
                       </TableRow>
@@ -315,9 +352,41 @@ const VirtualCardAdmin = () => {
                               rel="noopener noreferrer"
                               className="text-primary hover:underline inline-flex items-center gap-1 text-sm"
                             >
-                              {truncateAddress(event.txHash)}
+                              {event.txHash ? truncateAddress(event.txHash) : "N/A"}
                               <ExternalLink className="h-3 w-3" />
                             </a>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleFreezeCard(event.user)}
+                                disabled={isFreezing}
+                                className="gap-1 text-blue-500 border-blue-500/30 hover:bg-blue-500/10"
+                              >
+                                {isFreezing ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Snowflake className="h-3 w-3" />
+                                )}
+                                Freeze
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleUnfreezeCard(event.user)}
+                                disabled={isUnfreezing}
+                                className="gap-1 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10"
+                              >
+                                {isUnfreezing ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Sun className="h-3 w-3" />
+                                )}
+                                Unfreeze
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
