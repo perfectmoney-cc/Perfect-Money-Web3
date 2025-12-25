@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, ArrowDownToLine, QrCode, Copy, Loader2, Sparkles, ShoppingCart, Settings, Store } from "lucide-react";
+import { ArrowLeft, CreditCard, ArrowDownToLine, QrCode, Copy, Loader2, Sparkles, ShoppingCart, Settings, Store, AlertCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { bsc } from "wagmi/chains";
@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 
 const tierNames = ["Standard", "Bronze", "Silver", "Gold", "Platinum", "Diamond"];
+const CARD_CREATION_FEE = "0.005"; // 0.005 BNB
 
 interface Merchant {
   address: string;
@@ -53,6 +54,12 @@ const VirtualCardPage = () => {
   const MERCHANT_CONTRACT_ADDRESS = CONTRACT_ADDRESSES[56].PMMerchant;
   const VIRTUAL_CARD_CONTRACT_ADDRESS = CONTRACT_ADDRESSES[56].PMVirtualCard || "0x0000000000000000000000000000000000000000";
 
+  // Get BNB balance for fee payment
+  const { data: bnbBalance } = useBalance({
+    address: address,
+    chainId: 56
+  });
+
   // Get PM token balance
   const { data: tokenBalance } = useBalance({
     address: address,
@@ -60,8 +67,16 @@ const VirtualCardPage = () => {
     chainId: 56
   });
 
+  // Get card creation fee from contract
+  const { data: contractFee } = useReadContract({
+    address: VIRTUAL_CARD_CONTRACT_ADDRESS as `0x${string}`,
+    abi: VIRTUAL_CARD_ABI,
+    functionName: "cardCreationFee",
+    query: { enabled: VIRTUAL_CARD_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000" }
+  });
+
   // Check if user has a card
-  const { data: hasCard, refetch: refetchHasCard } = useReadContract({
+  const { data: hasCard, refetch: refetchHasCard, isLoading: isLoadingHasCard } = useReadContract({
     address: VIRTUAL_CARD_CONTRACT_ADDRESS as `0x${string}`,
     abi: VIRTUAL_CARD_ABI,
     functionName: "hasCard",
@@ -70,12 +85,20 @@ const VirtualCardPage = () => {
   });
 
   // Get card info
-  const { data: cardInfo, refetch: refetchCardInfo } = useReadContract({
+  const { data: cardInfo, refetch: refetchCardInfo, isLoading: isLoadingCardInfo } = useReadContract({
     address: VIRTUAL_CARD_CONTRACT_ADDRESS as `0x${string}`,
     abi: VIRTUAL_CARD_ABI,
     functionName: "getCardInfo",
     args: address ? [address] : undefined,
     query: { enabled: !!address && !!hasCard }
+  });
+
+  // Get global stats
+  const { data: globalStats, refetch: refetchGlobalStats } = useReadContract({
+    address: VIRTUAL_CARD_CONTRACT_ADDRESS as `0x${string}`,
+    abi: VIRTUAL_CARD_ABI,
+    functionName: "getGlobalStats",
+    query: { enabled: VIRTUAL_CARD_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000" }
   });
 
   // Get tier info for cashback rate
@@ -107,10 +130,19 @@ const VirtualCardPage = () => {
     return `${combined.slice(0, 4)} ${combined.slice(4, 8)} ${combined.slice(8, 12)} ${combined.slice(12, 16)}`;
   };
 
-  const cardNumber = address ? generateCardNumber(address) : "0000 0000 0000 0000";
+  const cardNumber = cardInfo?.cardNumber || (address ? generateCardNumber(address) : "0000 0000 0000 0000");
   const cardBalance = cardInfo ? Number(formatEther(cardInfo.balance || BigInt(0))) : 0;
   const cardTier = cardInfo?.tier || 0;
   const cashbackRate = tierInfo ? Number(tierInfo.cashbackRate) / 100 : 0.5;
+  const isCardActive = cardInfo?.isActive || false;
+  const cardCreatedAt = cardInfo?.createdAt ? new Date(Number(cardInfo.createdAt) * 1000) : null;
+  const totalDeposited = cardInfo ? Number(formatEther(cardInfo.totalDeposited || BigInt(0))) : 0;
+  const totalSpent = cardInfo ? Number(formatEther(cardInfo.totalSpent || BigInt(0))) : 0;
+  
+  // Determine if card should be blurred
+  const shouldBlurCard = !hasCard || !isCardActive;
+  const creationFee = contractFee ? formatEther(contractFee) : CARD_CREATION_FEE;
+  const hasSufficientBnb = bnbBalance && Number(formatEther(bnbBalance.value)) >= Number(creationFee);
 
   // Generate QR code
   useEffect(() => {
@@ -162,7 +194,8 @@ const VirtualCardPage = () => {
     if (createSuccess || spendSuccess || withdrawSuccess) {
       refetchHasCard();
       refetchCardInfo();
-      if (createSuccess) toast.success("Virtual Card created successfully!");
+      refetchGlobalStats();
+      if (createSuccess) toast.success("Virtual Card created successfully! Fee: " + creationFee + " BNB");
       if (spendSuccess) {
         toast.success("Payment successful! Cashback applied.");
         setShowSpendModal(false);
@@ -178,12 +211,17 @@ const VirtualCardPage = () => {
       toast.error("Please connect your wallet first");
       return;
     }
+    if (!hasSufficientBnb) {
+      toast.error(`Insufficient BNB. You need at least ${creationFee} BNB to create a card.`);
+      return;
+    }
     createCard({
       address: VIRTUAL_CARD_CONTRACT_ADDRESS as `0x${string}`,
       abi: VIRTUAL_CARD_ABI,
       functionName: "createCard",
       account: address,
-      chain: bsc
+      chain: bsc,
+      value: parseEther(creationFee)
     });
   };
 
@@ -267,7 +305,23 @@ const VirtualCardPage = () => {
 
         {/* Virtual Card Display */}
         <div className="relative mb-8 px-2 sm:px-0">
-          <div className={`relative w-full max-w-[360px] sm:max-w-md mx-auto aspect-[1.586/1] rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300`}>
+          {/* Blur overlay for inactive/non-existent cards */}
+          {shouldBlurCard && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center">
+              <div className="bg-background/80 backdrop-blur-sm rounded-xl p-4 text-center max-w-xs mx-4">
+                <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+                <p className="font-semibold text-foreground">
+                  {!hasCard ? "No Card Created" : "Card Inactive"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {!hasCard 
+                    ? `Create a virtual card for ${creationFee} BNB to unlock features` 
+                    : "Your card is currently inactive. Contact support."}
+                </p>
+              </div>
+            </div>
+          )}
+          <div className={`relative w-full max-w-[360px] sm:max-w-md mx-auto aspect-[1.586/1] rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300 ${shouldBlurCard ? 'blur-sm opacity-60' : ''}`}>
             {/* Card Background - Red gradient matching Perfect Money style */}
             <div className="absolute inset-0 bg-gradient-to-br from-red-600 via-red-700 to-red-900" />
             
@@ -352,18 +406,25 @@ const VirtualCardPage = () => {
         {/* Action Buttons */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           {!hasCard ? (
-            <Button
-              onClick={handleCreateCard}
-              disabled={isCreating || !isConnected}
-              className="col-span-2 md:col-span-3 bg-primary hover:bg-primary/90 h-12"
-            >
-              {isCreating ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              ) : (
-                <Sparkles className="h-5 w-5 mr-2" />
+            <div className="col-span-2 md:col-span-3 space-y-2">
+              <Button
+                onClick={handleCreateCard}
+                disabled={isCreating || !isConnected || !hasSufficientBnb}
+                className="w-full bg-primary hover:bg-primary/90 h-12"
+              >
+                {isCreating ? (
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                ) : (
+                  <Sparkles className="h-5 w-5 mr-2" />
+                )}
+                Create Virtual Card ({creationFee} BNB)
+              </Button>
+              {!hasSufficientBnb && isConnected && (
+                <p className="text-xs text-center text-destructive">
+                  Insufficient BNB balance. You need at least {creationFee} BNB.
+                </p>
               )}
-              Create Virtual Card
-            </Button>
+            </div>
           ) : (
             <>
               <Button
@@ -477,6 +538,28 @@ const VirtualCardPage = () => {
           )}
         </div>
 
+        {/* Global Stats from Blockchain */}
+        {globalStats && (
+          <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20 mb-4">
+            <CardContent className="py-4">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-primary">{Number(globalStats[0]).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Total Cards</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-primary">{Number(formatEther(globalStats[1])).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Total Deposits (PM)</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-primary">{Number(formatEther(globalStats[2]))}%</p>
+                  <p className="text-xs text-muted-foreground">Top Up Fee</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Card Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="bg-card border-border">
@@ -498,8 +581,8 @@ const VirtualCardPage = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground text-sm">Status</span>
-                <span className={`text-sm font-medium ${hasCard ? "text-green-500" : "text-yellow-500"}`}>
-                  {hasCard ? "Active" : "Not Created"}
+                <span className={`text-sm font-medium ${hasCard && isCardActive ? "text-green-500" : hasCard ? "text-yellow-500" : "text-destructive"}`}>
+                  {hasCard ? (isCardActive ? "Active" : "Inactive") : "Not Created"}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -514,6 +597,12 @@ const VirtualCardPage = () => {
                 <span className="text-muted-foreground text-sm">Card Balance</span>
                 <span className="text-sm font-bold text-primary">{cardBalance.toLocaleString()} PM</span>
               </div>
+              {cardCreatedAt && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Created</span>
+                  <span className="text-sm">{cardCreatedAt.toLocaleDateString()}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -521,7 +610,7 @@ const VirtualCardPage = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <QrCode className="h-4 w-4 text-primary" />
-                Wallet Info
+                Wallet & Card Stats
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -532,21 +621,27 @@ const VirtualCardPage = () => {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground text-sm">Wallet Balance</span>
+                <span className="text-muted-foreground text-sm">BNB Balance</span>
+                <span className="text-sm font-medium">
+                  {bnbBalance ? parseFloat(formatEther(bnbBalance.value)).toFixed(4) : "0"} BNB
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground text-sm">PM Token Balance</span>
                 <span className="text-sm font-medium">
                   {tokenBalance ? parseFloat(tokenBalance.formatted).toLocaleString() : "0"} PM
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground text-sm">Total Deposited</span>
-                <span className="text-sm font-medium">
-                  {cardInfo ? Number(formatEther(cardInfo.totalDeposited || BigInt(0))).toLocaleString() : "0"} PM
+                <span className="text-sm font-medium text-green-500">
+                  {totalDeposited.toLocaleString()} PM
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground text-sm">Total Spent</span>
-                <span className="text-sm font-medium">
-                  {cardInfo ? Number(formatEther(cardInfo.totalSpent || BigInt(0))).toLocaleString() : "0"} PM
+                <span className="text-sm font-medium text-blue-500">
+                  {totalSpent.toLocaleString()} PM
                 </span>
               </div>
             </CardContent>

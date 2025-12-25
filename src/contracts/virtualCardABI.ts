@@ -74,6 +74,20 @@ export const VIRTUAL_CARD_ABI = [
     "inputs": [],
     "name": "createCard",
     "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "cardCreationFee",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "_fee", "type": "uint256" }],
+    "name": "setCardCreationFee",
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
