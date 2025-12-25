@@ -263,55 +263,82 @@ export const VIRTUAL_CARD_ABI = [
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint8", "name": "newTier", "type": "uint8" }],
+    "name": "upgradeTier",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "user", "type": "address" }],
+    "name": "getNextTierRequirement",
+    "outputs": [
+      { "internalType": "uint8", "name": "nextTier", "type": "uint8" },
+      { "internalType": "uint256", "name": "requiredDeposit", "type": "uint256" },
+      { "internalType": "uint256", "name": "currentDeposit", "type": "uint256" },
+      { "internalType": "uint256", "name": "remaining", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "user", "type": "address" }],
+    "name": "freezeCard",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "user", "type": "address" }],
+    "name": "unfreezeCard",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawFees",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "accumulatedFees",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "accumulatedBNBFees",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getCardHolders",
+    "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "tier", "type": "uint8" },
+      { "internalType": "uint256", "name": "minBalance", "type": "uint256" },
+      { "internalType": "uint256", "name": "dailyLimit", "type": "uint256" },
+      { "internalType": "uint256", "name": "monthlyLimit", "type": "uint256" },
+      { "internalType": "uint256", "name": "cashbackRate", "type": "uint256" }
+    ],
+    "name": "setTierInfo",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ] as const;
 
 // PMVirtualCard Contract Address - BSC Mainnet
 export const VIRTUAL_CARD_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // TODO: Update after deployment
-
-// Extended ABI with additional functions for full contract interaction
-export const PM_VIRTUAL_CARD_FULL_ABI = [
-  ...VIRTUAL_CARD_ABI,
-  // Additional admin functions
-  {
-    inputs: [
-      { internalType: "uint8", name: "tier", type: "uint8" },
-      { internalType: "uint256", name: "minBalance", type: "uint256" },
-      { internalType: "uint256", name: "dailyLimit", type: "uint256" },
-      { internalType: "uint256", name: "monthlyLimit", type: "uint256" },
-      { internalType: "uint256", name: "cashbackRate", type: "uint256" }
-    ],
-    name: "setTierInfo",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function"
-  },
-  {
-    inputs: [{ internalType: "address", name: "user", type: "address" }],
-    name: "freezeCard",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function"
-  },
-  {
-    inputs: [{ internalType: "address", name: "user", type: "address" }],
-    name: "unfreezeCard",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function"
-  },
-  {
-    inputs: [],
-    name: "withdrawFees",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function"
-  },
-  {
-    inputs: [],
-    name: "accumulatedFees",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function"
-  }
-] as const;
