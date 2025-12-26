@@ -149,18 +149,20 @@ const PartnersAdmin = () => {
   };
 
   const handleToggleStatus = (walletAddress: string, currentStatus: string) => {
-    const newStatus = currentStatus === "Active";
+    const isActive = currentStatus === "Active";
+    // Contract expects: 0 = Active, 1 = Inactive, 2 = Suspended
+    const newStatusCode = isActive ? 1 : 0;
     if (PM_PARTNERSHIP_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000") {
       updateStatus({
         address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
         abi: PMPartnershipABI,
         functionName: "updatePartnerStatus",
-        args: [walletAddress as `0x${string}`, !newStatus],
+        args: [walletAddress as `0x${string}`, newStatusCode],
         account: address,
         chain: bsc
       });
     } else {
-      toast.success(`Partner status changed to ${newStatus ? "Inactive" : "Active"} (Mock)`);
+      toast.success(`Partner status changed to ${isActive ? "Inactive" : "Active"} (Mock)`);
     }
   };
 
@@ -179,14 +181,16 @@ const PartnersAdmin = () => {
         abi: PMPartnershipABI,
         functionName: "addPartner",
         args: [
-          address, // Using current wallet as partner address for demo
-          newPartner.name,
-          newPartner.type,
-          newPartner.country,
-          "",
-          BigInt(Math.floor(lat)),
-          BigInt(Math.floor(lng)),
-          0 // Bronze tier
+          address, // _wallet - Using current wallet as partner address for demo
+          newPartner.name, // _name
+          newPartner.type, // _partnerType
+          newPartner.country, // _country
+          "", // _city
+          newPartner.email, // _email
+          BigInt(Math.floor(lat)), // _latitude
+          BigInt(Math.floor(lng)), // _longitude
+          0, // _tier (Bronze)
+          newPartner.description // _description
         ],
         account: address,
         chain: bsc
