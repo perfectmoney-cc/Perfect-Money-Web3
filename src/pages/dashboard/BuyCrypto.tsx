@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, CreditCard, Wallet, Shield, ExternalLink, Check, AlertCircle, Loader2, QrCode, Copy, Share2, Bell, BellRing, History, TrendingUp, TrendingDown, Trash2, Clock } from "lucide-react";
+import { ArrowLeft, CreditCard, Wallet, Shield, ExternalLink, Check, AlertCircle, Loader2, QrCode, Copy, Share2, Bell, BellRing, History, TrendingUp, TrendingDown, Trash2, Clock, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePriceAlerts } from "@/hooks/usePriceAlerts";
 import { usePurchaseHistory } from "@/hooks/usePurchaseHistory";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import CryptoPriceChart from "@/components/CryptoPriceChart";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://xldptgnlmwpfcvnpvkbx.supabase.co";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsZHB0Z25sbXdwZmN2bnB2a2J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUyNDI4NjMsImV4cCI6MjA2MDgxODg2M30.cUNkPBxNBV1LjNHdaASPjYzGyjjLmvUe3CcDj9RjWbg";
@@ -32,42 +33,19 @@ const currencySymbols: Record<string, string> = {
   AED: "د.إ",
   PHP: "₱",
   ZAR: "R",
+  CAD: "C$",
+  AUD: "A$",
+  JPY: "¥",
+  INR: "₹",
 };
 
-// Provider logo components (inline SVG for reliability)
-const MoonPayLogo = () => (
-  <div className="w-10 h-10 rounded-lg bg-[#7D00FF] flex items-center justify-center">
-    <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
-      <circle cx="12" cy="12" r="8" fill="white"/>
-      <circle cx="12" cy="12" r="4" fill="#7D00FF"/>
-    </svg>
-  </div>
-);
-
-const TransakLogo = () => (
-  <div className="w-10 h-10 rounded-lg bg-[#0052FF] flex items-center justify-center">
-    <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" fill="none"/>
-    </svg>
-  </div>
-);
-
-const RampLogo = () => (
-  <div className="w-10 h-10 rounded-lg bg-[#21BF73] flex items-center justify-center">
-    <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
-      <path d="M4 12l8-8 8 8M4 12l8 8 8-8" stroke="white" strokeWidth="2" fill="none"/>
-    </svg>
-  </div>
-);
-
-const SimplexLogo = () => (
-  <div className="w-10 h-10 rounded-lg bg-[#FF6B00] flex items-center justify-center">
-    <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
-      <rect x="4" y="4" width="16" height="16" rx="2" stroke="white" strokeWidth="2" fill="none"/>
-      <path d="M8 12h8M12 8v8" stroke="white" strokeWidth="2"/>
-    </svg>
-  </div>
-);
+// Real provider logos from official sources
+const providerLogos = {
+  moonpay: "https://www.moonpay.com/assets/logo-full-white.svg",
+  transak: "https://assets.transak.com/images/website/transak-logo-white.svg",
+  ramp: "https://ramp.network/assets/images/Logo.svg",
+  simplex: "https://www.simplex.com/wp-content/uploads/2021/07/simplex-logo.svg",
+};
 
 const BuyCrypto = () => {
   const { address, isConnected } = useAccount();
@@ -75,17 +53,12 @@ const BuyCrypto = () => {
   const [currency, setCurrency] = useState("USD");
   const [crypto, setCrypto] = useState("BNB");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [cryptoPrices, setCryptoPrices] = useState<Record<string, number>>({
-    BNB: 620,
-    ETH: 3400,
-    BTC: 95000,
-    USDT: 1,
-    USDC: 1,
-    SOL: 180,
-    MATIC: 0.55,
-    AVAX: 35,
+    BNB: 620, ETH: 3400, BTC: 95000, USDT: 1, USDC: 1, SOL: 180, MATIC: 0.55, AVAX: 35,
   });
   const [priceChanges, setPriceChanges] = useState<Record<string, number>>({});
+  const [priceSource, setPriceSource] = useState<string>("loading");
   const [showQRModal, setShowQRModal] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<typeof onRampProviders[0] | null>(null);
@@ -93,47 +66,55 @@ const BuyCrypto = () => {
   const [alertPrice, setAlertPrice] = useState("");
   const [alertCondition, setAlertCondition] = useState<"above" | "below">("above");
   const [alertCrypto, setAlertCrypto] = useState("BNB");
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
   const { alerts, addAlert, removeAlert, checkAlerts, activeAlerts, triggeredAlerts, clearTriggeredAlerts } = usePriceAlerts();
-  const { purchases, addPurchase, updatePurchaseStatus } = usePurchaseHistory();
+  const { purchases, addPurchase } = usePurchaseHistory();
 
   const currencySymbol = currencySymbols[currency] || "$";
 
   // Fetch live prices on mount and when currency changes
-  useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/get-crypto-prices`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ currency }),
-        });
-        const data = await response.json();
-        if (data?.prices) {
-          setCryptoPrices(data.prices);
-          if (data.changes) {
-            setPriceChanges(data.changes);
-          }
-          // Check for triggered alerts
-          const triggered = checkAlerts(data.prices);
-          triggered.forEach(alert => {
-            toast.info(
-              `🔔 Price Alert: ${alert.crypto} is now ${alert.condition} ${currencySymbols[alert.currency]}${alert.targetPrice.toLocaleString()}`,
-              { duration: 10000 }
-            );
-          });
+  const fetchPrices = async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) setIsRefreshing(true);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/get-crypto-prices`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ currency }),
+      });
+      const data = await response.json();
+      if (data?.prices) {
+        setCryptoPrices(data.prices);
+        if (data.changes) {
+          setPriceChanges(data.changes);
         }
-      } catch (error) {
-        console.error("Failed to fetch prices:", error);
+        setPriceSource(data.source || "api");
+        setLastUpdate(new Date());
+        
+        // Check for triggered alerts
+        const triggered = checkAlerts(data.prices);
+        triggered.forEach(alert => {
+          toast.info(
+            `🔔 Price Alert: ${alert.crypto} is now ${alert.condition} ${currencySymbols[alert.currency]}${alert.targetPrice.toLocaleString()}`,
+            { duration: 10000 }
+          );
+        });
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch prices:", error);
+    } finally {
+      if (showRefreshIndicator) setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     fetchPrices();
-    // Refresh every 30 seconds for more real-time updates
-    const interval = setInterval(fetchPrices, 30000);
+    // Refresh every 30 seconds
+    const interval = setInterval(() => fetchPrices(), 30000);
     return () => clearInterval(interval);
   }, [currency, checkAlerts]);
 
@@ -152,7 +133,7 @@ const BuyCrypto = () => {
   const onRampProviders = [
     { 
       name: "MoonPay", 
-      Logo: MoonPayLogo,
+      logo: "https://images.seeklogo.com/logo-png/52/1/moonpay-logo-png_seeklogo-525606.png",
       fees: "3.5%",
       methods: ["Card", "Bank", "Apple Pay"],
       url: "https://www.moonpay.com/buy",
@@ -160,7 +141,7 @@ const BuyCrypto = () => {
     },
     { 
       name: "Transak", 
-      Logo: TransakLogo,
+      logo: "https://assets.transak.com/images/website/transak-logo-symbol.svg",
       fees: "1.5%",
       methods: ["Card", "Bank", "UPI"],
       url: "https://global.transak.com",
@@ -168,7 +149,7 @@ const BuyCrypto = () => {
     },
     { 
       name: "Ramp", 
-      Logo: RampLogo,
+      logo: "https://ramp.network/assets/images/Logo.svg",
       fees: "2.9%",
       methods: ["Card", "Bank", "PIX"],
       url: "https://ramp.network/buy",
@@ -176,7 +157,7 @@ const BuyCrypto = () => {
     },
     { 
       name: "Simplex", 
-      Logo: SimplexLogo,
+      logo: "/lovable-uploads/cf98e305-dcf8-4399-b94b-276114c91207.png",
       fees: "3.5%",
       methods: ["Card", "Apple Pay"],
       url: "https://www.simplex.com",
@@ -236,10 +217,7 @@ const BuyCrypto = () => {
       const qr = await QRCode.toDataURL(url, {
         width: 256,
         margin: 2,
-        color: {
-          dark: "#000000",
-          light: "#FFFFFF"
-        }
+        color: { dark: "#000000", light: "#FFFFFF" }
       });
       setQrCodeUrl(qr);
       setShowQRModal(true);
@@ -348,6 +326,16 @@ const BuyCrypto = () => {
               variant="outline" 
               size="sm" 
               className="gap-2"
+              onClick={() => fetchPrices(true)}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
               onClick={() => setShowAlertModal(true)}
             >
               <Bell className="h-4 w-4" />
@@ -356,7 +344,7 @@ const BuyCrypto = () => {
                   {activeAlerts.length}
                 </Badge>
               )}
-              Price Alerts
+              Alerts
             </Button>
           </div>
         </div>
@@ -374,10 +362,16 @@ const BuyCrypto = () => {
                   <p className="font-mono text-sm">{address?.slice(0, 8)}...{address?.slice(-6)}</p>
                 </div>
               </div>
-              <Badge variant="outline" className="text-green-500 border-green-500/30">
-                <Check className="h-3 w-3 mr-1" />
-                Connected
-              </Badge>
+              <div className="flex items-center gap-3">
+                <div className="text-right text-xs text-muted-foreground">
+                  <p>Source: {priceSource}</p>
+                  <p>Updated: {lastUpdate.toLocaleTimeString()}</p>
+                </div>
+                <Badge variant="outline" className="text-green-500 border-green-500/30">
+                  <Check className="h-3 w-3 mr-1" />
+                  Connected
+                </Badge>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -399,7 +393,16 @@ const BuyCrypto = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="buy">
+          <TabsContent value="buy" className="space-y-6">
+            {/* Price Chart */}
+            <CryptoPriceChart 
+              crypto={crypto}
+              currency={currency}
+              currencySymbol={currencySymbol}
+              currentPrice={currentRate}
+              priceChange={currentChange}
+            />
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Amount Selection */}
               <Card className="bg-card border-border">
@@ -427,12 +430,9 @@ const BuyCrypto = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="EUR">EUR</SelectItem>
-                          <SelectItem value="GBP">GBP</SelectItem>
-                          <SelectItem value="AED">AED</SelectItem>
-                          <SelectItem value="PHP">PHP</SelectItem>
-                          <SelectItem value="ZAR">ZAR</SelectItem>
+                          {Object.keys(currencySymbols).map((cur) => (
+                            <SelectItem key={cur} value={cur}>{cur}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -487,7 +487,7 @@ const BuyCrypto = () => {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <AlertCircle className="h-4 w-4" />
-                        <span>Live rate (updates every 30s)</span>
+                        <span>Live rate (30s refresh)</span>
                       </div>
                       <Badge variant="outline" className="text-xs animate-pulse">Live</Badge>
                     </div>
@@ -517,7 +517,21 @@ const BuyCrypto = () => {
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
-                          <provider.Logo />
+                          <div 
+                            className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden"
+                            style={{ backgroundColor: provider.color }}
+                          >
+                            <img 
+                              src={provider.logo} 
+                              alt={provider.name}
+                              className="w-8 h-8 object-contain"
+                              onError={(e) => {
+                                // Fallback to text if image fails
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.parentElement!.innerHTML = `<span class="text-white font-bold text-sm">${provider.name[0]}</span>`;
+                              }}
+                            />
+                          </div>
                           <div>
                             <p className="font-semibold">{provider.name}</p>
                             <p className="text-xs text-muted-foreground">Fees: {provider.fees}</p>
@@ -557,7 +571,7 @@ const BuyCrypto = () => {
             </div>
 
             {/* Security Notice */}
-            <Card className="bg-green-500/5 border-green-500/20 mt-6">
+            <Card className="bg-green-500/5 border-green-500/20">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   <Shield className="h-5 w-5 text-green-500 mt-0.5" />
