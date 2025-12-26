@@ -98,12 +98,13 @@ const BuyCrypto = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // CoinMarketCap logo URLs (official static assets)
   const cryptoOptions = [
-    { symbol: "BNB", name: "BNB", icon: "/lovable-uploads/7b5fd6b8-d8da-4c74-8293-111cf452fe53.png" },
-    { symbol: "ETH", name: "Ethereum", icon: "/lovable-uploads/67e5df-f02c-4357-b617-2d006356db35.png" },
-    { symbol: "BTC", name: "Bitcoin", icon: "🪙" },
-    { symbol: "USDT", name: "Tether", icon: "/lovable-uploads/62397bdd-bb52-4769-8622-3b3f8c73031f.png" },
-    { symbol: "USDC", name: "USD Coin", icon: "/lovable-uploads/cf98e305-dcf8-4399-b94b-276114c91207.png" },
+    { symbol: "BNB", name: "BNB", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/1839.png" },
+    { symbol: "ETH", name: "Ethereum", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png" },
+    { symbol: "BTC", name: "Bitcoin", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png" },
+    { symbol: "USDT", name: "Tether", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/825.png" },
+    { symbol: "USDC", name: "USD Coin", icon: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png" },
   ];
 
   const onRampProviders = [
@@ -324,22 +325,25 @@ const BuyCrypto = () => {
               <div className="space-y-2">
                 <Label>You Receive</Label>
                 <div className="flex gap-2">
-                  <div className="flex-1 p-3 bg-muted rounded-lg text-lg font-medium">
+                  <div className="flex-1 p-3 bg-primary/10 rounded-lg text-lg font-medium text-primary">
                     ~{estimatedCrypto.toFixed(6)}
                   </div>
                   <Select value={crypto} onValueChange={setCrypto}>
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue />
+                    <SelectTrigger className="w-[140px]">
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={selectedCrypto?.icon} 
+                          alt={crypto} 
+                          className="w-5 h-5 rounded-full" 
+                        />
+                        <span>{crypto}</span>
+                      </div>
                     </SelectTrigger>
                     <SelectContent>
                       {cryptoOptions.map((c) => (
                         <SelectItem key={c.symbol} value={c.symbol}>
                           <span className="flex items-center gap-2">
-                            {c.icon.startsWith("/") ? (
-                              <img src={c.icon} alt={c.symbol} className="w-4 h-4" />
-                            ) : (
-                              <span>{c.icon}</span>
-                            )}
+                            <img src={c.icon} alt={c.symbol} className="w-5 h-5 rounded-full" />
                             <span>{c.symbol}</span>
                           </span>
                         </SelectItem>
