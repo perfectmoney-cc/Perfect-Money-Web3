@@ -5,6 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Exchange rates relative to USD
+const exchangeRates: Record<string, number> = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  AED: 3.67,
+  PHP: 56.50,
+  ZAR: 18.20,
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -14,45 +24,65 @@ serve(async (req) => {
     const alchemyApiKey = Deno.env.get("ALCHEMY_API_KEY");
     
     if (!alchemyApiKey) {
-      throw new Error("ALCHEMY_API_KEY not configured");
+      console.warn("ALCHEMY_API_KEY not configured, using CoinGecko fallback");
     }
 
-    // Fetch BNB price from Alchemy using their price API
-    // Using BSC mainnet endpoint
-    const response = await fetch(
-      `https://bnb-mainnet.g.alchemy.com/v2/${alchemyApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "alchemy_getTokenMetadata",
-          params: ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"] // WBNB
-        }),
-      }
-    );
+    // Get currency from request body if provided
+    const body = await req.json().catch(() => ({}));
+    const currency = body.currency || "USD";
+    const exchangeRate = exchangeRates[currency] || 1;
 
-    // Also get ETH price from CoinGecko as fallback for accurate pricing
+    // Fetch prices from CoinGecko (includes SOL, MATIC, AVAX)
     const priceResponse = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=binancecoin,ethereum,bitcoin,tether,usd-coin&vs_currencies=usd",
+      "https://api.coingecko.com/api/v3/simple/price?ids=binancecoin,ethereum,bitcoin,tether,usd-coin,solana,matic-network,avalanche-2&vs_currencies=usd&include_24hr_change=true",
       { headers: { "Accept": "application/json" } }
     );
 
-    const priceData = await priceResponse.json();
+    if (!priceResponse.ok) {
+      throw new Error(`CoinGecko API error: ${priceResponse.status}`);
+    }
 
-    const prices = {
-      BNB: priceData.binancecoin?.usd || 620,
-      ETH: priceData.ethereum?.usd || 3400,
-      BTC: priceData.bitcoin?.usd || 95000,
-      USDT: priceData.tether?.usd || 1,
-      USDC: priceData["usd-coin"]?.usd || 1,
+    const priceData = await priceResponse.json();
+    console.log("CoinGecko price data:", priceData);
+
+    // Convert prices to selected currency
+    const prices: Record<string, number> = {
+      BNB: (priceData.binancecoin?.usd || 620) * exchangeRate,
+      ETH: (priceData.ethereum?.usd || 3400) * exchangeRate,
+      BTC: (priceData.bitcoin?.usd || 95000) * exchangeRate,
+      USDT: (priceData.tether?.usd || 1) * exchangeRate,
+      USDC: (priceData["usd-coin"]?.usd || 1) * exchangeRate,
+      SOL: (priceData.solana?.usd || 180) * exchangeRate,
+      MATIC: (priceData["matic-network"]?.usd || 0.55) * exchangeRate,
+      AVAX: (priceData["avalanche-2"]?.usd || 35) * exchangeRate,
     };
 
-    return new Response(JSON.stringify({ prices, timestamp: Date.now() }), {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    // Get 24h changes
+    const changes: Record<string, number> = {
+      BNB: priceData.binancecoin?.usd_24h_change || 0,
+      ETH: priceData.ethereum?.usd_24h_change || 0,
+      BTC: priceData.bitcoin?.usd_24h_change || 0,
+      USDT: priceData.tether?.usd_24h_change || 0,
+      USDC: priceData["usd-coin"]?.usd_24h_change || 0,
+      SOL: priceData.solana?.usd_24h_change || 0,
+      MATIC: priceData["matic-network"]?.usd_24h_change || 0,
+      AVAX: priceData["avalanche-2"]?.usd_24h_change || 0,
+    };
+
+    return new Response(
+      JSON.stringify({ 
+        prices, 
+        changes,
+        currency,
+        exchangeRate,
+        exchangeRates,
+        timestamp: Date.now() 
+      }), 
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
   } catch (error: any) {
     console.error("Error fetching crypto prices:", error);
     
@@ -63,10 +93,21 @@ serve(async (req) => {
       BTC: 95000,
       USDT: 1,
       USDC: 1,
+      SOL: 180,
+      MATIC: 0.55,
+      AVAX: 35,
     };
 
     return new Response(
-      JSON.stringify({ prices: fallbackPrices, timestamp: Date.now(), fallback: true }),
+      JSON.stringify({ 
+        prices: fallbackPrices, 
+        changes: {},
+        currency: "USD",
+        exchangeRate: 1,
+        exchangeRates: { USD: 1, EUR: 0.92, GBP: 0.79, AED: 3.67, PHP: 56.50, ZAR: 18.20 },
+        timestamp: Date.now(), 
+        fallback: true 
+      }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
