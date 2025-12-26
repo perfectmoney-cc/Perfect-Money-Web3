@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Settings, Users, Building2, Globe, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, MapPin, ExternalLink, Shield, Search, Filter, RefreshCw, Download, FileText, FileSpreadsheet } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Settings, Users, Building2, Globe, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, MapPin, ExternalLink, Shield, Search, Filter, RefreshCw, Download, FileText, FileSpreadsheet, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { bsc } from "wagmi/chains";
@@ -16,6 +17,7 @@ import { toast } from "sonner";
 import { formatEther, parseEther } from "viem";
 import { CONTRACT_ADDRESSES } from "@/contracts/addresses";
 import { PMPartnershipABI, PM_PARTNERSHIP_CONTRACT_ADDRESS } from "@/contracts/partnershipABI";
+import { PartnerAnalytics } from "@/components/partners/PartnerAnalytics";
 import {
   Dialog,
   DialogContent,
@@ -125,7 +127,10 @@ const PartnersAdmin = () => {
   const [appCountryFilter, setAppCountryFilter] = useState("all");
   const [appStatusFilter, setAppStatusFilter] = useState("all");
 
-  // Check if contract is deployed
+  // Bulk selection states
+  const [selectedApplications, setSelectedApplications] = useState<number[]>([]);
+  const [isBulkApproving, setIsBulkApproving] = useState(false);
+  const [isBulkRejecting, setIsBulkRejecting] = useState(false);
   const isContractDeployed = PM_PARTNERSHIP_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000";
 
   // Read global stats from contract
@@ -368,6 +373,84 @@ const PartnersAdmin = () => {
     setAppStatusFilter("all");
   };
 
+  // Bulk action handlers
+  const handleSelectApplication = (id: number, checked: boolean) => {
+    if (checked) {
+      setSelectedApplications(prev => [...prev, id]);
+    } else {
+      setSelectedApplications(prev => prev.filter(appId => appId !== id));
+    }
+  };
+
+  const handleSelectAllApplications = (checked: boolean) => {
+    if (checked) {
+      const pendingIds = filteredApplications.filter(a => a.status === 0).map(a => a.id);
+      setSelectedApplications(pendingIds);
+    } else {
+      setSelectedApplications([]);
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedApplications.length === 0) {
+      toast.error("No applications selected");
+      return;
+    }
+    
+    setIsBulkApproving(true);
+    
+    if (isContractDeployed) {
+      // In production, you would batch these transactions or use a multicall
+      for (const id of selectedApplications) {
+        await approveApp({
+          address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
+          abi: PMPartnershipABI,
+          functionName: "approveApplication",
+          args: [BigInt(id)],
+          account: address,
+          chain: bsc
+        });
+      }
+    } else {
+      // Demo mode
+      toast.success(`Approved ${selectedApplications.length} applications (Demo mode)`);
+    }
+    
+    setSelectedApplications([]);
+    setIsBulkApproving(false);
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedApplications.length === 0) {
+      toast.error("No applications selected");
+      return;
+    }
+    
+    setIsBulkRejecting(true);
+    
+    if (isContractDeployed) {
+      // In production, you would batch these transactions or use a multicall
+      for (const id of selectedApplications) {
+        await rejectApp({
+          address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
+          abi: PMPartnershipABI,
+          functionName: "rejectApplication",
+          args: [BigInt(id), "Bulk rejected by admin"],
+          account: address,
+          chain: bsc
+        });
+      }
+    } else {
+      // Demo mode
+      toast.error(`Rejected ${selectedApplications.length} applications (Demo mode)`);
+    }
+    
+    setSelectedApplications([]);
+    setIsBulkRejecting(false);
+  };
+
+  const pendingApplications = filteredApplications.filter(a => a.status === 0);
+
   // Export functions
   const exportToCSV = () => {
     const headers = ["Name", "Type", "Country", "City", "Email", "Tier", "Status", "Revenue (PM)", "Joined", "Wallet"];
@@ -598,7 +681,11 @@ const PartnersAdmin = () => {
         <Tabs defaultValue="partners" className="space-y-6">
           <TabsList className="bg-muted/50 p-1">
             <TabsTrigger value="partners">Active Partners ({filteredPartners.length})</TabsTrigger>
-            <TabsTrigger value="applications">Applications ({filteredApplications.filter(a => a.status === 0).length})</TabsTrigger>
+            <TabsTrigger value="applications">Applications ({pendingApplications.length})</TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-1">
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
@@ -902,10 +989,46 @@ const PartnersAdmin = () => {
             <Card className="bg-card border-border">
               <CardHeader>
                 <div className="flex flex-col gap-4">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" />
-                    Partnership Applications
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Users className="h-5 w-5 text-primary" />
+                      Partnership Applications
+                    </CardTitle>
+                    
+                    {/* Bulk Actions */}
+                    {selectedApplications.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{selectedApplications.length} selected</Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleBulkApprove}
+                          disabled={isBulkApproving}
+                          className="gap-1 text-green-500 border-green-500/30 hover:bg-green-500/10"
+                        >
+                          {isBulkApproving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                          Approve All
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleBulkReject}
+                          disabled={isBulkRejecting}
+                          className="gap-1 text-red-500 border-red-500/30 hover:bg-red-500/10"
+                        >
+                          {isBulkRejecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3" />}
+                          Reject All
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setSelectedApplications([])}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   
                   {/* Search and Filters */}
                   <div className="flex flex-col md:flex-row gap-3">
@@ -981,6 +1104,12 @@ const PartnersAdmin = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-10">
+                            <Checkbox
+                              checked={pendingApplications.length > 0 && selectedApplications.length === pendingApplications.length}
+                              onCheckedChange={(checked) => handleSelectAllApplications(checked as boolean)}
+                            />
+                          </TableHead>
                           <TableHead>Company</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Location</TableHead>
@@ -994,13 +1123,21 @@ const PartnersAdmin = () => {
                       <TableBody>
                         {filteredApplications.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                               No applications found matching your filters
                             </TableCell>
                           </TableRow>
                         ) : (
                           filteredApplications.map((app) => (
                             <TableRow key={app.id}>
+                              <TableCell>
+                                {app.status === 0 && (
+                                  <Checkbox
+                                    checked={selectedApplications.includes(app.id)}
+                                    onCheckedChange={(checked) => handleSelectApplication(app.id, checked as boolean)}
+                                  />
+                                )}
+                              </TableCell>
                               <TableCell className="font-medium">{app.name}</TableCell>
                               <TableCell className="text-muted-foreground text-sm">{app.email}</TableCell>
                               <TableCell>
@@ -1070,6 +1207,10 @@ const PartnersAdmin = () => {
                 </p>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <PartnerAnalytics partners={partners} />
           </TabsContent>
 
           <TabsContent value="settings">

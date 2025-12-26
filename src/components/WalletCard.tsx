@@ -250,9 +250,9 @@ export const WalletCard = ({
     color: "text-red-500",
     bg: "bg-red-500/10"
   }, {
-    to: "/dashboard/community",
-    icon: MessageCircle,
-    label: "Community",
+    to: "/dashboard/buy-crypto",
+    icon: CreditCard,
+    label: "Buy Crypto",
     color: "text-cyan-500",
     bg: "bg-cyan-500/10"
   }, {
