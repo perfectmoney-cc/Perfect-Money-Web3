@@ -1,14 +1,59 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, CreditCard, Wallet, Shield, ExternalLink, Check, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Wallet, Shield, ExternalLink, Check, AlertCircle, Loader2, QrCode, Copy, Share2, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
+import QRCode from "qrcode";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://xldptgnlmwpfcvnpvkbx.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsZHB0Z25sbXdwZmN2bnB2a2J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUyNDI4NjMsImV4cCI6MjA2MDgxODg2M30.cUNkPBxNBV1LjNHdaASPjYzGyjjLmvUe3CcDj9RjWbg";
+
+// Provider logo components (inline SVG for reliability)
+const MoonPayLogo = () => (
+  <div className="w-10 h-10 rounded-lg bg-[#7D00FF] flex items-center justify-center">
+    <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
+      <circle cx="12" cy="12" r="8" fill="white"/>
+      <circle cx="12" cy="12" r="4" fill="#7D00FF"/>
+    </svg>
+  </div>
+);
+
+const TransakLogo = () => (
+  <div className="w-10 h-10 rounded-lg bg-[#0052FF] flex items-center justify-center">
+    <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" fill="none"/>
+    </svg>
+  </div>
+);
+
+const RampLogo = () => (
+  <div className="w-10 h-10 rounded-lg bg-[#21BF73] flex items-center justify-center">
+    <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
+      <path d="M4 12l8-8 8 8M4 12l8 8 8-8" stroke="white" strokeWidth="2" fill="none"/>
+    </svg>
+  </div>
+);
+
+const SimplexLogo = () => (
+  <div className="w-10 h-10 rounded-lg bg-[#FF6B00] flex items-center justify-center">
+    <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
+      <rect x="4" y="4" width="16" height="16" rx="2" stroke="white" strokeWidth="2" fill="none"/>
+      <path d="M8 12h8M12 8v8" stroke="white" strokeWidth="2"/>
+    </svg>
+  </div>
+);
 
 const BuyCrypto = () => {
   const { address, isConnected } = useAccount();
@@ -16,56 +61,93 @@ const BuyCrypto = () => {
   const [currency, setCurrency] = useState("USD");
   const [crypto, setCrypto] = useState("BNB");
   const [isLoading, setIsLoading] = useState(false);
+  const [cryptoPrices, setCryptoPrices] = useState<Record<string, number>>({
+    BNB: 620,
+    ETH: 3400,
+    BTC: 95000,
+    USDT: 1,
+    USDC: 1,
+  });
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<typeof onRampProviders[0] | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+
+  // Fetch live prices on mount
+  useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/get-crypto-prices`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+        });
+        const data = await response.json();
+        if (data?.prices) {
+          setCryptoPrices(data.prices);
+        }
+      } catch (error) {
+        console.error("Failed to fetch prices:", error);
+      }
+    };
+    fetchPrices();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchPrices, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const cryptoOptions = [
-    { symbol: "BNB", name: "BNB", rate: 620, icon: "🔶" },
-    { symbol: "ETH", name: "Ethereum", rate: 3400, icon: "💎" },
-    { symbol: "BTC", name: "Bitcoin", rate: 95000, icon: "🪙" },
-    { symbol: "USDT", name: "Tether", rate: 1, icon: "💵" },
-    { symbol: "USDC", name: "USD Coin", rate: 1, icon: "💰" },
+    { symbol: "BNB", name: "BNB", icon: "/lovable-uploads/7b5fd6b8-d8da-4c74-8293-111cf452fe53.png" },
+    { symbol: "ETH", name: "Ethereum", icon: "/lovable-uploads/67e5df-f02c-4357-b617-2d006356db35.png" },
+    { symbol: "BTC", name: "Bitcoin", icon: "🪙" },
+    { symbol: "USDT", name: "Tether", icon: "/lovable-uploads/62397bdd-bb52-4769-8622-3b3f8c73031f.png" },
+    { symbol: "USDC", name: "USD Coin", icon: "/lovable-uploads/cf98e305-dcf8-4399-b94b-276114c91207.png" },
   ];
 
   const onRampProviders = [
     { 
       name: "MoonPay", 
-      logo: "🌙",
+      Logo: MoonPayLogo,
       fees: "3.5%",
       methods: ["Card", "Bank", "Apple Pay"],
-      url: "https://www.moonpay.com/buy"
+      url: "https://www.moonpay.com/buy",
+      color: "#7D00FF"
     },
     { 
       name: "Transak", 
-      logo: "🚀",
+      Logo: TransakLogo,
       fees: "1.5%",
       methods: ["Card", "Bank", "UPI"],
-      url: "https://global.transak.com"
+      url: "https://global.transak.com",
+      color: "#0052FF"
     },
     { 
       name: "Ramp", 
-      logo: "⚡",
+      Logo: RampLogo,
       fees: "2.9%",
       methods: ["Card", "Bank", "PIX"],
-      url: "https://ramp.network/buy"
+      url: "https://ramp.network/buy",
+      color: "#21BF73"
     },
     { 
       name: "Simplex", 
-      logo: "🔷",
+      Logo: SimplexLogo,
       fees: "3.5%",
       methods: ["Card", "Apple Pay"],
-      url: "https://www.simplex.com"
+      url: "https://www.simplex.com",
+      color: "#FF6B00"
     },
   ];
 
   const selectedCrypto = cryptoOptions.find(c => c.symbol === crypto);
-  const estimatedCrypto = selectedCrypto ? (parseFloat(amount) / selectedCrypto.rate) : 0;
+  const currentRate = cryptoPrices[crypto] || 1;
+  const estimatedCrypto = parseFloat(amount) / currentRate;
 
-  const handleBuy = (provider: typeof onRampProviders[0]) => {
-    if (!isConnected || !address) {
-      toast.error("Please connect your wallet first");
-      return;
-    }
-
-    // Build on-ramp URL with wallet address
+  const buildOnRampUrl = (provider: typeof onRampProviders[0]) => {
+    if (!address) return "";
+    
     const params = new URLSearchParams({
       walletAddress: address,
       cryptoCurrency: crypto,
@@ -73,9 +155,69 @@ const BuyCrypto = () => {
       fiatValue: amount,
     });
 
-    const url = `${provider.url}?${params.toString()}`;
+    return `${provider.url}?${params.toString()}`;
+  };
+
+  const handleBuy = (provider: typeof onRampProviders[0]) => {
+    if (!isConnected || !address) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    const url = buildOnRampUrl(provider);
     window.open(url, "_blank");
     toast.success(`Redirecting to ${provider.name}...`);
+  };
+
+  const handleShowQR = async (provider: typeof onRampProviders[0]) => {
+    if (!address) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    setSelectedProvider(provider);
+    const url = buildOnRampUrl(provider);
+    
+    try {
+      const qr = await QRCode.toDataURL(url, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: "#000000",
+          light: "#FFFFFF"
+        }
+      });
+      setQrCodeUrl(qr);
+      setShowQRModal(true);
+    } catch (error) {
+      toast.error("Failed to generate QR code");
+    }
+  };
+
+  const copyLink = () => {
+    if (!selectedProvider) return;
+    const url = buildOnRampUrl(selectedProvider);
+    navigator.clipboard.writeText(url);
+    toast.success("Link copied to clipboard!");
+  };
+
+  const shareLink = async () => {
+    if (!selectedProvider) return;
+    const url = buildOnRampUrl(selectedProvider);
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Buy ${crypto} with ${selectedProvider.name}`,
+          text: `Buy ${crypto} directly to wallet ${address?.slice(0, 8)}...${address?.slice(-4)}`,
+          url: url,
+        });
+      } catch (error) {
+        copyLink();
+      }
+    } else {
+      copyLink();
+    }
   };
 
   if (!isConnected) {
@@ -193,7 +335,11 @@ const BuyCrypto = () => {
                       {cryptoOptions.map((c) => (
                         <SelectItem key={c.symbol} value={c.symbol}>
                           <span className="flex items-center gap-2">
-                            <span>{c.icon}</span>
+                            {c.icon.startsWith("/") ? (
+                              <img src={c.icon} alt={c.symbol} className="w-4 h-4" />
+                            ) : (
+                              <span>{c.icon}</span>
+                            )}
                             <span>{c.symbol}</span>
                           </span>
                         </SelectItem>
@@ -204,11 +350,14 @@ const BuyCrypto = () => {
               </div>
 
               <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Rate is estimated and may vary</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Live rate (updates every minute)</span>
+                  </div>
+                  <Badge variant="outline" className="text-xs">Live</Badge>
                 </div>
-                <p>1 {crypto} ≈ ${selectedCrypto?.rate.toLocaleString()} {currency}</p>
+                <p className="font-medium">1 {crypto} ≈ ${currentRate.toLocaleString()} {currency}</p>
               </div>
             </CardContent>
           </Card>
@@ -222,21 +371,35 @@ const BuyCrypto = () => {
               {onRampProviders.map((provider) => (
                 <div 
                   key={provider.name}
-                  className="p-4 border border-border rounded-lg hover:border-primary/50 transition-colors cursor-pointer"
-                  onClick={() => handleBuy(provider)}
+                  className="p-4 border border-border rounded-lg hover:border-primary/50 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{provider.logo}</span>
+                      <provider.Logo />
                       <div>
                         <p className="font-semibold">{provider.name}</p>
                         <p className="text-xs text-muted-foreground">Fees: {provider.fees}</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-1">
-                      Buy
-                      <ExternalLink className="h-3 w-3" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleShowQR(provider)}
+                        title="Show QR Code"
+                      >
+                        <QrCode className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-1"
+                        onClick={() => handleBuy(provider)}
+                      >
+                        Buy
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     {provider.methods.map((method) => (
@@ -267,6 +430,44 @@ const BuyCrypto = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* QR Code Modal */}
+      <Dialog open={showQRModal} onOpenChange={setShowQRModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />
+              Share Purchase Link
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-4">
+            {qrCodeUrl && (
+              <div className="bg-white p-4 rounded-lg">
+                <img src={qrCodeUrl} alt="QR Code" className="w-48 h-48" />
+              </div>
+            )}
+            <div className="text-center">
+              <p className="font-semibold">{selectedProvider?.name}</p>
+              <p className="text-sm text-muted-foreground">
+                Buy {amount} {currency} worth of {crypto}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">
+                To: {address?.slice(0, 10)}...{address?.slice(-8)}
+              </p>
+            </div>
+            <div className="flex gap-2 w-full">
+              <Button variant="outline" className="flex-1 gap-2" onClick={copyLink}>
+                <Copy className="h-4 w-4" />
+                Copy Link
+              </Button>
+              <Button className="flex-1 gap-2" onClick={shareLink}>
+                <Share2 className="h-4 w-4" />
+                Share
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

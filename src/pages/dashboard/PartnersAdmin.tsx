@@ -38,6 +38,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 const tierNames = ["Bronze", "Silver", "Gold", "Platinum"];
 const statusNames = ["Active", "Pending", "Inactive", "Suspended"];
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://xldptgnlmwpfcvnpvkbx.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsZHB0Z25sbXdwZmN2bnB2a2J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUyNDI4NjMsImV4cCI6MjA2MDgxODg2M30.cUNkPBxNBV1LjNHdaASPjYzGyjjLmvUe3CcDj9RjWbg";
+
 interface Partner {
   id: number;
   wallet: string;
@@ -278,7 +281,30 @@ const PartnersAdmin = () => {
   const pendingAppsCount = isContractDeployed && globalStats ? Number(globalStats[2]) : applications.filter(a => a.status === 0).length;
   const totalRevenuePaid = isContractDeployed && globalStats ? Number(formatEther(globalStats[3])) : 0;
 
-  const handleApprove = (id: number) => {
+  // Send email notification helper
+  const sendPartnerStatusEmail = async (email: string, name: string, status: "approved" | "rejected", tier?: string, reason?: string) => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/send-partner-status-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ email, name, status, tier, reason }),
+      });
+      
+      if (response.ok) {
+        toast.success(`Email notification sent to ${email}`);
+      }
+    } catch (error) {
+      console.error("Failed to send email:", error);
+    }
+  };
+
+  const handleApprove = async (id: number) => {
+    const app = applications.find(a => a.id === id);
+    
     if (isContractDeployed) {
       approveApp({
         address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
@@ -291,20 +317,32 @@ const PartnersAdmin = () => {
     } else {
       toast.success(`Application #${id} approved! (Demo mode)`);
     }
+    
+    // Send email notification
+    if (app) {
+      await sendPartnerStatusEmail(app.email, app.name, "approved", tierNames[app.requestedTier]);
+    }
   };
 
-  const handleReject = (id: number) => {
+  const handleReject = async (id: number, reason: string = "Application did not meet requirements") => {
+    const app = applications.find(a => a.id === id);
+    
     if (isContractDeployed) {
       rejectApp({
         address: PM_PARTNERSHIP_CONTRACT_ADDRESS as `0x${string}`,
         abi: PMPartnershipABI,
         functionName: "rejectApplication",
-        args: [BigInt(id), "Rejected by admin"],
+        args: [BigInt(id), reason],
         account: address,
         chain: bsc
       });
     } else {
       toast.error(`Application #${id} rejected (Demo mode)`);
+    }
+    
+    // Send email notification
+    if (app) {
+      await sendPartnerStatusEmail(app.email, app.name, "rejected", undefined, reason);
     }
   };
 
@@ -416,6 +454,14 @@ const PartnersAdmin = () => {
       toast.success(`Approved ${selectedApplications.length} applications (Demo mode)`);
     }
     
+    // Send emails to all approved applications
+    for (const id of selectedApplications) {
+      const app = applications.find(a => a.id === id);
+      if (app) {
+        await sendPartnerStatusEmail(app.email, app.name, "approved", tierNames[app.requestedTier]);
+      }
+    }
+    
     setSelectedApplications([]);
     setIsBulkApproving(false);
   };
@@ -443,6 +489,14 @@ const PartnersAdmin = () => {
     } else {
       // Demo mode
       toast.error(`Rejected ${selectedApplications.length} applications (Demo mode)`);
+    }
+    
+    // Send emails to all rejected applications
+    for (const id of selectedApplications) {
+      const app = applications.find(a => a.id === id);
+      if (app) {
+        await sendPartnerStatusEmail(app.email, app.name, "rejected", undefined, "Application was rejected in bulk review");
+      }
     }
     
     setSelectedApplications([]);
