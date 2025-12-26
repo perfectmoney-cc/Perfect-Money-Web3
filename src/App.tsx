@@ -42,6 +42,7 @@ import AirdropAdminPage from "./pages/dashboard/AirdropAdmin";
 import SwapPage from "./pages/dashboard/Swap";
 import TokenSecurityPage from "./pages/dashboard/TokenSecurity";
 import CommunityPage from "./pages/dashboard/Community";
+import BuyCryptoPage from "./pages/dashboard/BuyCrypto";
 import TokenSenderPage from "./pages/dashboard/TokenSender";
 import TokenLockerPage from "./pages/dashboard/TokenLocker";
 import PresaleAdminPage from "./pages/dashboard/PresaleAdmin";
@@ -123,6 +124,7 @@ const App = () => (
               <Route path="/dashboard/trade" element={<Trade />} />
               <Route path="/dashboard/token-security" element={<TokenSecurityPage />} />
               <Route path="/dashboard/community" element={<CommunityPage />} />
+              <Route path="/dashboard/buy-crypto" element={<BuyCryptoPage />} />
               <Route path="/dashboard/token-sender" element={<TokenSenderPage />} />
               <Route path="/dashboard/token-locker" element={<TokenLockerPage />} />
               <Route path="/dashboard/presale-admin" element={<PresaleAdminPage />} />
