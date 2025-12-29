@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, CreditCard, Wallet, Shield, ExternalLink, Check, AlertCircle, Loader2, QrCode, Copy, Share2, Bell, BellRing, History, TrendingUp, TrendingDown, Trash2, Clock, RefreshCw } from "lucide-react";
+import { ArrowLeft, CreditCard, Wallet, Shield, ExternalLink, Check, AlertCircle, Loader2, QrCode, Copy, Share2, Bell, BellRing, History, TrendingUp, TrendingDown, Trash2, Clock, RefreshCw, CalendarClock, Play, Pause, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
@@ -19,7 +19,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePriceAlerts } from "@/hooks/usePriceAlerts";
 import { usePurchaseHistory } from "@/hooks/usePurchaseHistory";
+import { useRecurringPurchases } from "@/hooks/useRecurringPurchases";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import CryptoPriceChart from "@/components/CryptoPriceChart";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://xldptgnlmwpfcvnpvkbx.supabase.co";
@@ -61,6 +63,7 @@ const BuyCrypto = () => {
   const [priceSource, setPriceSource] = useState<string>("loading");
   const [showQRModal, setShowQRModal] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
+  const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<typeof onRampProviders[0] | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [alertPrice, setAlertPrice] = useState("");
@@ -68,8 +71,25 @@ const BuyCrypto = () => {
   const [alertCrypto, setAlertCrypto] = useState("BNB");
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
+  // Recurring purchase form state
+  const [recurringCrypto, setRecurringCrypto] = useState("BNB");
+  const [recurringAmount, setRecurringAmount] = useState("100");
+  const [recurringFrequency, setRecurringFrequency] = useState<"daily" | "weekly" | "monthly">("weekly");
+  const [recurringDayOfWeek, setRecurringDayOfWeek] = useState(1); // Monday
+  const [recurringDayOfMonth, setRecurringDayOfMonth] = useState(1);
+  const [recurringHour, setRecurringHour] = useState(9);
+  const [recurringProvider, setRecurringProvider] = useState("MoonPay");
+  
   const { alerts, addAlert, removeAlert, checkAlerts, activeAlerts, triggeredAlerts, clearTriggeredAlerts } = usePriceAlerts();
   const { purchases, addPurchase } = usePurchaseHistory();
+  const { 
+    recurringPurchases, 
+    activePurchases, 
+    addRecurringPurchase, 
+    toggleRecurringPurchase, 
+    removeRecurringPurchase,
+    getFrequencyLabel 
+  } = useRecurringPurchases();
 
   const currencySymbol = currencySymbols[currency] || "$";
 
@@ -331,6 +351,20 @@ const BuyCrypto = () => {
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => setShowRecurringModal(true)}
+            >
+              <CalendarClock className="h-4 w-4" />
+              {activePurchases.length > 0 && (
+                <Badge variant="secondary" className="h-5 w-5 p-0 flex items-center justify-center text-xs">
+                  {activePurchases.length}
+                </Badge>
+              )}
+              Auto-Buy
             </Button>
             <Button 
               variant="outline" 
@@ -853,6 +887,291 @@ const BuyCrypto = () => {
                 </ScrollArea>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Recurring Purchase Modal */}
+      <Dialog open={showRecurringModal} onOpenChange={setShowRecurringModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5" />
+              Recurring Purchases
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Create New Recurring Purchase */}
+            <div className="p-4 border border-border rounded-lg space-y-3">
+              <p className="font-medium text-sm">Schedule Auto-Buy</p>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Crypto</Label>
+                  <Select value={recurringCrypto} onValueChange={setRecurringCrypto}>
+                    <SelectTrigger>
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={cryptoOptions.find(c => c.symbol === recurringCrypto)?.icon} 
+                          alt={recurringCrypto} 
+                          className="w-4 h-4 rounded-full" 
+                        />
+                        <span>{recurringCrypto}</span>
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cryptoOptions.map((c) => (
+                        <SelectItem key={c.symbol} value={c.symbol}>
+                          <span className="flex items-center gap-2">
+                            <img src={c.icon} alt={c.symbol} className="w-4 h-4 rounded-full" />
+                            <span>{c.symbol}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-1">
+                  <Label className="text-xs">Amount ({currency})</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      {currencySymbol}
+                    </span>
+                    <Input
+                      type="number"
+                      value={recurringAmount}
+                      onChange={(e) => setRecurringAmount(e.target.value)}
+                      className="pl-7"
+                      min="10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Frequency</Label>
+                  <Select value={recurringFrequency} onValueChange={(v: "daily" | "weekly" | "monthly") => setRecurringFrequency(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {recurringFrequency === 'weekly' && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Day of Week</Label>
+                    <Select value={recurringDayOfWeek.toString()} onValueChange={(v) => setRecurringDayOfWeek(parseInt(v))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Sunday</SelectItem>
+                        <SelectItem value="1">Monday</SelectItem>
+                        <SelectItem value="2">Tuesday</SelectItem>
+                        <SelectItem value="3">Wednesday</SelectItem>
+                        <SelectItem value="4">Thursday</SelectItem>
+                        <SelectItem value="5">Friday</SelectItem>
+                        <SelectItem value="6">Saturday</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {recurringFrequency === 'monthly' && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Day of Month</Label>
+                    <Select value={recurringDayOfMonth.toString()} onValueChange={(v) => setRecurringDayOfMonth(parseInt(v))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                          <SelectItem key={day} value={day.toString()}>{day}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {recurringFrequency === 'daily' && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Time</Label>
+                    <Select value={recurringHour.toString()} onValueChange={(v) => setRecurringHour(parseInt(v))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                          <SelectItem key={hour} value={hour.toString()}>
+                            {hour.toString().padStart(2, '0')}:00
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {(recurringFrequency === 'weekly' || recurringFrequency === 'monthly') && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Time</Label>
+                  <Select value={recurringHour.toString()} onValueChange={(v) => setRecurringHour(parseInt(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                        <SelectItem key={hour} value={hour.toString()}>
+                          {hour.toString().padStart(2, '0')}:00
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <Label className="text-xs">Provider</Label>
+                <Select value={recurringProvider} onValueChange={setRecurringProvider}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {onRampProviders.map((p) => (
+                      <SelectItem key={p.name} value={p.name}>
+                        <span className="flex items-center gap-2">
+                          <div 
+                            className="w-4 h-4 rounded flex items-center justify-center"
+                            style={{ backgroundColor: p.color }}
+                          >
+                            <span className="text-white text-[8px] font-bold">{p.name[0]}</span>
+                          </div>
+                          {p.name} ({p.fees})
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button 
+                className="w-full gap-2" 
+                onClick={() => {
+                  if (!address) {
+                    toast.error("Please connect your wallet first");
+                    return;
+                  }
+                  
+                  addRecurringPurchase({
+                    crypto: recurringCrypto,
+                    fiatAmount: parseFloat(recurringAmount),
+                    fiatCurrency: currency,
+                    provider: recurringProvider,
+                    frequency: recurringFrequency,
+                    dayOfWeek: recurringFrequency === 'weekly' ? recurringDayOfWeek : undefined,
+                    dayOfMonth: recurringFrequency === 'monthly' ? recurringDayOfMonth : undefined,
+                    hour: recurringHour,
+                    walletAddress: address,
+                    isActive: true,
+                  });
+                  
+                  toast.success(`Auto-buy scheduled: ${currencySymbol}${recurringAmount} ${recurringCrypto} ${recurringFrequency}`);
+                  setShowRecurringModal(false);
+                }}
+              >
+                <CalendarClock className="h-4 w-4" />
+                Schedule Auto-Buy
+              </Button>
+            </div>
+
+            {/* Active Recurring Purchases */}
+            {recurringPurchases.length > 0 && (
+              <div className="space-y-2">
+                <p className="font-medium text-sm flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Scheduled Purchases ({recurringPurchases.length})
+                </p>
+                <ScrollArea className="h-[200px]">
+                  <div className="space-y-2">
+                    {recurringPurchases.map((rp) => (
+                      <div 
+                        key={rp.id}
+                        className={`p-3 border rounded-lg ${rp.isActive ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/30'}`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <img 
+                              src={cryptoOptions.find(c => c.symbol === rp.crypto)?.icon} 
+                              alt={rp.crypto}
+                              className="w-6 h-6 rounded-full"
+                            />
+                            <div>
+                              <p className="text-sm font-medium">
+                                {currencySymbols[rp.fiatCurrency]}{rp.fiatAmount} → {rp.crypto}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {getFrequencyLabel(rp.frequency, rp.dayOfWeek, rp.dayOfMonth)} at {rp.hour.toString().padStart(2, '0')}:00
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={rp.isActive}
+                              onCheckedChange={() => toggleRecurringPurchase(rp.id)}
+                            />
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-7 w-7 text-red-500 hover:text-red-600"
+                              onClick={() => removeRecurringPurchase(rp.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            via {rp.provider}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Next: {new Date(rp.nextExecution).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {rp.totalExecutions > 0 && (
+                          <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">
+                              Executed: {rp.totalExecutions}x
+                            </span>
+                            <span className="text-primary font-medium">
+                              Total: {currencySymbols[rp.fiatCurrency]}{rp.totalSpent.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
+            <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
+              <p className="flex items-center gap-1 mb-1">
+                <AlertCircle className="h-3 w-3" />
+                How it works
+              </p>
+              <p>
+                Scheduled purchases will open the provider page automatically at the set time when you have the app open. 
+                For fully automated purchases, enable browser notifications.
+              </p>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
