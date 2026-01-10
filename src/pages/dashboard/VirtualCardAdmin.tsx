@@ -14,7 +14,7 @@ import { bsc } from "wagmi/chains";
 import { toast } from "sonner";
 import { formatEther, parseEther } from "viem";
 import { VIRTUAL_CARD_ABI, VIRTUAL_CARD_CONTRACT_ADDRESS } from "@/contracts/virtualCardABI";
-import { useVirtualCardTransactions } from "@/hooks/useVirtualCardTransactions";
+import { useVirtualCardEvents } from "@/hooks/useVirtualCardEvents";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const tierNames = ["Novice", "Bronze", "Silver", "Gold", "Platinum", "Diamond"];
@@ -32,7 +32,7 @@ const VirtualCardAdmin = () => {
     isActive: true
   });
 
-  const { cardEvents, isLoading: eventsLoading, refetch: refetchEvents } = useVirtualCardTransactions();
+  const { cardCreatedEvents: cardEvents, cardStats, isLoading: eventsLoading, refetch: refetchEvents, topUpEvents, spendEvents } = useVirtualCardEvents();
 
   // Read global stats
   const { data: globalStats, refetch: refetchStats } = useReadContract({
@@ -339,7 +339,7 @@ const VirtualCardAdmin = () => {
                           </TableCell>
                           <TableCell>
                             <span className="px-2 py-1 bg-primary/10 text-primary rounded text-xs">
-                              {tierNames[event.tier] || "Novice"}
+                              {tierNames[event.data?.tier ?? 0] || "Novice"}
                             </span>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
