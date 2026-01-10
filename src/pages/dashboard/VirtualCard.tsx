@@ -19,6 +19,7 @@ import { PMMerchantABI } from "@/contracts/merchantABI";
 import VirtualCardTransactionHistory from "@/components/VirtualCardTransactionHistory";
 import VirtualCardTopUp from "@/components/virtual-card/VirtualCardTopUp";
 import TierUpgradeCard from "@/components/virtual-card/TierUpgradeCard";
+import CardSpendingMerchant from "@/components/virtual-card/CardSpendingMerchant";
 import {
   Dialog,
   DialogContent,
@@ -321,10 +322,14 @@ const VirtualCardPage = () => {
 
         {/* Tab Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="card" className="gap-2">
               <CreditCard className="h-4 w-4" />
               Card
+            </TabsTrigger>
+            <TabsTrigger value="spend" className="gap-2" disabled={!hasCard || cardBalance <= 0}>
+              <Store className="h-4 w-4" />
+              Spend
             </TabsTrigger>
             <TabsTrigger value="topup" className="gap-2" disabled={!hasCard}>
               <ArrowUpCircle className="h-4 w-4" />
@@ -697,6 +702,17 @@ const VirtualCardPage = () => {
         </div>
           </TabsContent>
 
+
+          <TabsContent value="spend">
+            <CardSpendingMerchant 
+              cardBalance={cardBalance}
+              cashbackRate={cashbackRate}
+              onSuccess={() => {
+                refetchCardInfo();
+                refetchGlobalStats();
+              }}
+            />
+          </TabsContent>
 
           <TabsContent value="topup">
             <VirtualCardTopUp />

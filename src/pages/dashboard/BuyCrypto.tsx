@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, CreditCard, Wallet, Shield, ExternalLink, Check, AlertCircle, Loader2, QrCode, Copy, Share2, Bell, BellRing, History, TrendingUp, TrendingDown, Trash2, Clock, RefreshCw, CalendarClock, Play, Pause, Calendar } from "lucide-react";
+import { ArrowLeft, CreditCard, Wallet, Shield, ExternalLink, Check, AlertCircle, Loader2, QrCode, Copy, Share2, Bell, BellRing, History, TrendingUp, TrendingDown, Trash2, Clock, RefreshCw, CalendarClock, Play, Pause, Calendar, PieChart, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
@@ -23,6 +23,9 @@ import { useRecurringPurchases } from "@/hooks/useRecurringPurchases";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import CryptoPriceChart from "@/components/CryptoPriceChart";
+import PortfolioTracker from "@/components/PortfolioTracker";
+import DCAAnalytics from "@/components/DCAAnalytics";
+import NotificationSettings from "@/components/NotificationSettings";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://xldptgnlmwpfcvnpvkbx.supabase.co";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsZHB0Z25sbXdwZmN2bnB2a2J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUyNDI4NjMsImV4cCI6MjA2MDgxODg2M30.cUNkPBxNBV1LjNHdaASPjYzGyjjLmvUe3CcDj9RjWbg";
@@ -411,10 +414,18 @@ const BuyCrypto = () => {
         </Card>
 
         <Tabs defaultValue="buy" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="buy" className="gap-2">
               <CreditCard className="h-4 w-4" />
-              Buy Crypto
+              Buy
+            </TabsTrigger>
+            <TabsTrigger value="portfolio" className="gap-2">
+              <PieChart className="h-4 w-4" />
+              Portfolio
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              DCA
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
               <History className="h-4 w-4" />
@@ -619,6 +630,25 @@ const BuyCrypto = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="portfolio" className="space-y-6">
+            <PortfolioTracker 
+              currentPrices={cryptoPrices}
+              currency={currency}
+              currencySymbol={currencySymbol}
+            />
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            <DCAAnalytics 
+              currentPrices={cryptoPrices}
+              currency={currency}
+              currencySymbol={currencySymbol}
+            />
+            
+            {/* Notification Settings */}
+            <NotificationSettings />
           </TabsContent>
 
           <TabsContent value="history">
