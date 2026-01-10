@@ -5,14 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Store, Search, Loader2, CreditCard, Gift, ExternalLink, Star, MapPin, Clock } from 'lucide-react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { Store, Search, Loader2, CreditCard, Gift, ExternalLink, Star, MapPin, Clock, RefreshCw } from 'lucide-react';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { bsc } from 'wagmi/chains';
-import { parseEther, formatEther } from 'viem';
+import { parseEther } from 'viem';
 import { toast } from 'sonner';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
 import { VIRTUAL_CARD_ABI } from '@/contracts/virtualCardABI';
-import { PMMerchantABI } from '@/contracts/merchantABI';
+import { useMerchantRegistry, BlockchainMerchant } from '@/hooks/useMerchantRegistry';
 import {
   Dialog,
   DialogContent,
@@ -21,42 +21,29 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-interface Merchant {
-  address: string;
-  name: string;
-  category: string;
-  description: string;
-  logo?: string;
-  rating: number;
-  cashbackBonus: number;
-  isActive: boolean;
-}
-
 interface CardSpendingMerchantProps {
   cardBalance: number;
   cashbackRate: number;
   onSuccess?: () => void;
 }
 
-const CATEGORIES = ['All', 'Retail', 'Food & Dining', 'Entertainment', 'Travel', 'Services', 'Gaming'];
-
-const MOCK_MERCHANTS: Merchant[] = [
-  { address: '0x1234...5678', name: 'CryptoStore', category: 'Retail', description: 'Electronics & gadgets', rating: 4.8, cashbackBonus: 2, isActive: true },
-  { address: '0x2345...6789', name: 'GameVault', category: 'Gaming', description: 'Digital games & credits', rating: 4.6, cashbackBonus: 5, isActive: true },
-  { address: '0x3456...7890', name: 'FoodChain', category: 'Food & Dining', description: 'Restaurant delivery', rating: 4.5, cashbackBonus: 3, isActive: true },
-  { address: '0x4567...8901', name: 'TravelX', category: 'Travel', description: 'Flights & hotels', rating: 4.7, cashbackBonus: 4, isActive: true },
-  { address: '0x5678...9012', name: 'StreamPlus', category: 'Entertainment', description: 'Streaming subscriptions', rating: 4.4, cashbackBonus: 1, isActive: true },
-  { address: '0x6789...0123', name: 'CloudServices', category: 'Services', description: 'Cloud hosting & tools', rating: 4.9, cashbackBonus: 3, isActive: true },
-];
-
 const CardSpendingMerchant = ({ cardBalance, cashbackRate, onSuccess }: CardSpendingMerchantProps) => {
   const { address, isConnected } = useAccount();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
+  const [selectedMerchant, setSelectedMerchant] = useState<BlockchainMerchant | null>(null);
   const [spendAmount, setSpendAmount] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [merchants, setMerchants] = useState<Merchant[]>(MOCK_MERCHANTS);
+
+  const { 
+    merchants, 
+    isLoading: loadingMerchants, 
+    refetch: refetchMerchants,
+    categories,
+    getMerchantsByCategory,
+    searchMerchants,
+    getTopMerchants
+  } = useMerchantRegistry();
 
   const VIRTUAL_CARD_CONTRACT = CONTRACT_ADDRESSES[56]?.PMVirtualCard || '0x0000000000000000000000000000000000000000';
 
@@ -114,26 +101,37 @@ const CardSpendingMerchant = ({ cardBalance, cashbackRate, onSuccess }: CardSpen
     });
   };
 
-  const openPaymentModal = (merchant: Merchant) => {
+  const openPaymentModal = (merchant: BlockchainMerchant) => {
     setSelectedMerchant(merchant);
     setShowPaymentModal(true);
   };
 
-  const filteredMerchants = merchants.filter(m => {
-    const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          m.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || m.category === selectedCategory;
-    return matchesSearch && matchesCategory && m.isActive;
-  });
+  // Filter merchants based on search and category
+  const filteredMerchants = searchQuery 
+    ? searchMerchants(searchQuery).filter(m => selectedCategory === 'All' || m.category === selectedCategory)
+    : getMerchantsByCategory(selectedCategory);
+
+  const topMerchants = getTopMerchants(3);
 
   return (
     <>
       <Card className="bg-card border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Store className="h-5 w-5 text-primary" />
-            Spend with Merchants
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Store className="h-5 w-5 text-primary" />
+              Spend with Merchants
+              <Badge variant="secondary" className="text-xs">{merchants.length}</Badge>
+            </CardTitle>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => refetchMerchants()}
+              disabled={loadingMerchants}
+            >
+              <RefreshCw className={`h-4 w-4 ${loadingMerchants ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Search */}
@@ -150,7 +148,7 @@ const CardSpendingMerchant = ({ cardBalance, cashbackRate, onSuccess }: CardSpen
           {/* Categories */}
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-2 pb-2">
-              {CATEGORIES.map(cat => (
+              {['All', ...categories.filter(c => c !== 'General')].map(cat => (
                 <Button
                   key={cat}
                   variant={selectedCategory === cat ? 'default' : 'outline'}
@@ -167,7 +165,12 @@ const CardSpendingMerchant = ({ cardBalance, cashbackRate, onSuccess }: CardSpen
           {/* Merchant List */}
           <ScrollArea className="h-[400px]">
             <div className="space-y-3">
-              {filteredMerchants.length === 0 ? (
+              {loadingMerchants ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Loading merchants...</p>
+                </div>
+              ) : filteredMerchants.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Store className="h-10 w-10 mx-auto mb-2 opacity-50" />
                   <p>No merchants found</p>
@@ -198,11 +201,14 @@ const CardSpendingMerchant = ({ cardBalance, cashbackRate, onSuccess }: CardSpen
                           <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                              {merchant.rating}
+                              {merchant.rating.toFixed(1)}
                             </span>
                             <Badge variant="outline" className="text-xs">
                               {merchant.category}
                             </Badge>
+                            <span className="text-xs">
+                              {merchant.totalTransactions} sales
+                            </span>
                           </div>
                         </div>
                       </div>

@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, TrendingDown, Wallet, PieChart, BarChart3, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, PieChart, BarChart3, RefreshCw, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePurchaseHistory, Purchase } from '@/hooks/usePurchaseHistory';
+import { usePortfolioHistory } from '@/hooks/usePortfolioHistory';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPie, Pie, Cell } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface PortfolioAsset {
   crypto: string;
@@ -40,7 +42,9 @@ const COLORS = ['hsl(0, 85%, 50%)', 'hsl(45, 85%, 50%)', 'hsl(120, 85%, 40%)', '
 
 const PortfolioTracker = ({ currentPrices, currency, currencySymbol }: PortfolioTrackerProps) => {
   const { completedPurchases } = usePurchaseHistory();
+  const { saveSnapshot, getChartData, getReturns, hasHistory } = usePortfolioHistory();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [chartRange, setChartRange] = useState<'7' | '30' | '90'>('30');
 
   // Calculate portfolio from completed purchases
   const portfolio = useMemo((): PortfolioAsset[] => {
@@ -87,19 +91,48 @@ const PortfolioTracker = ({ currentPrices, currency, currencySymbol }: Portfolio
     color: COLORS[index % COLORS.length],
   }));
 
-  // Historical value simulation (would need real historical data in production)
+  // Save portfolio snapshot when values change
+  useEffect(() => {
+    if (totalValue > 0 && portfolio.length > 0) {
+      const holdings: Record<string, { amount: number; value: number; price: number }> = {};
+      portfolio.forEach(asset => {
+        holdings[asset.crypto] = {
+          amount: asset.amount,
+          value: asset.currentValue,
+          price: asset.currentPrice,
+        };
+      });
+      saveSnapshot(totalValue, totalCost, holdings);
+    }
+  }, [totalValue, totalCost, portfolio, saveSnapshot]);
+
+  // Get historical chart data
   const historyData = useMemo(() => {
+    const days = parseInt(chartRange);
+    const chartData = getChartData(days);
+    
+    // If we have history, use it
+    if (chartData.length > 0) {
+      return chartData;
+    }
+    
+    // Otherwise generate placeholder data based on current value
     const now = new Date();
-    return Array.from({ length: 30 }, (_, i) => {
+    return Array.from({ length: days }, (_, i) => {
       const date = new Date(now);
-      date.setDate(date.getDate() - (29 - i));
-      const variation = 1 + (Math.random() - 0.5) * 0.1;
+      date.setDate(date.getDate() - (days - 1 - i));
+      const variation = 1 + (Math.random() - 0.5) * 0.05;
       return {
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        value: totalValue * variation * (0.8 + i * 0.007),
+        value: totalValue * variation * (0.9 + i * (0.1 / days)),
+        cost: totalCost,
+        pnl: 0,
       };
     });
-  }, [totalValue]);
+  }, [chartRange, getChartData, totalValue, totalCost]);
+
+  // Calculate period returns
+  const periodReturns = useMemo(() => getReturns(parseInt(chartRange)), [chartRange, getReturns]);
 
   if (completedPurchases.length === 0) {
     return (
@@ -123,14 +156,26 @@ const PortfolioTracker = ({ currentPrices, currency, currencySymbol }: Portfolio
               <Wallet className="h-5 w-5 text-primary" />
               Portfolio Value
             </CardTitle>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setIsRefreshing(true)}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Select value={chartRange} onValueChange={(v: '7' | '30' | '90') => setChartRange(v)}>
+                <SelectTrigger className="w-[80px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7D</SelectItem>
+                  <SelectItem value="30">30D</SelectItem>
+                  <SelectItem value="90">90D</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsRefreshing(true)}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -145,6 +190,11 @@ const PortfolioTracker = ({ currentPrices, currency, currencySymbol }: Portfolio
                   {totalPnl >= 0 ? '+' : ''}{currencySymbol}{totalPnl.toFixed(2)} ({totalPnlPercent.toFixed(2)}%)
                 </span>
               </div>
+              {hasHistory && periodReturns.startValue > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {chartRange}D: {periodReturns.percentReturn >= 0 ? '+' : ''}{periodReturns.percentReturn.toFixed(2)}%
+                </p>
+              )}
             </div>
             <Badge variant="outline" className="text-xs">
               {portfolio.length} asset{portfolio.length !== 1 ? 's' : ''}
@@ -161,6 +211,17 @@ const PortfolioTracker = ({ currentPrices, currency, currencySymbol }: Portfolio
                     <stop offset="95%" stopColor="hsl(0, 85%, 50%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
+                <XAxis dataKey="date" hide />
+                <YAxis hide domain={['dataMin', 'dataMax']} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(0, 0%, 10%)', 
+                    border: '1px solid hsl(0, 0%, 20%)',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}
+                  formatter={(value: number) => [`${currencySymbol}${value.toFixed(2)}`, 'Value']}
+                />
                 <Area
                   type="monotone"
                   dataKey="value"
